@@ -1,0 +1,5 @@
+numpy
+optuna
+matplotlib
+pymoo
+pytest
