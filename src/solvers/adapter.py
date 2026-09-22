@@ -297,6 +297,9 @@ def rodar_neuro_boa(
     )
     from src.flowshop_engine import FlowShopEngine
 
+    # Neuro-BOA espera "makespan" (minusculo), ao contrario da engine que usa "Makespan"
+    obj_neuro = objective.lower()
+
     # Cria uma Instance a partir da engine oficial (formato esperado pelo Neuro-BOA)
     inst = Instance(
         name="orquestrada",
@@ -331,7 +334,7 @@ def rodar_neuro_boa(
         inst, cfg,
         mode=mode,
         seed=seed,
-        objective=objective,
+        objective=obj_neuro,
         verbose=verbose,
     )
     elapsed = time.time() - t0
