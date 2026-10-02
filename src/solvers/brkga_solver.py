@@ -33,7 +33,7 @@ class NPFSProblem(ElementwiseProblem):
 # 2. BRKGA fixo
 # --------------------------------------------------------------------------- #
 
-def run_brkga_fixo(engine, n_gen=200, seed=1,
+def run_brkga_fixo(engine, max_evals=10000, seed=1,
                    n_elites=20, n_offsprings=70, n_mutants=10,
                    bias=0.7, verbose=False):
     """
@@ -53,7 +53,7 @@ def run_brkga_fixo(engine, n_gen=200, seed=1,
         eliminate_duplicates=True,
     )
 
-    termination = get_termination("n_gen", n_gen)
+    termination = get_termination("n_eval", max_evals)
 
     result = minimize(
         problem,
@@ -70,6 +70,7 @@ def run_brkga_fixo(engine, n_gen=200, seed=1,
         F = pop.get("F").flatten()
         historico.append({
             "gen": g,
+            "n_evals": algo_estado.evaluator.n_eval,
             "best_makespan": float(F.min()),
             "pop_X": pop.get("X").copy(),
         })
@@ -264,7 +265,7 @@ def criar_controlador_qualidade(
 
 def run_brkga_fuzzy(
     engine,
-    n_gen=200,
+    max_evals=10000,
     seed=1,
     n_elites0=20,
     n_offsprings0=70,
@@ -302,7 +303,7 @@ def run_brkga_fuzzy(
         bias=bias,
         eliminate_duplicates=True,
     )
-    termination = get_termination("n_gen", n_gen)
+    termination = get_termination("n_eval", max_evals)
     algorithm.setup(problem, termination=termination, seed=seed, verbose=False)
 
     historico = []
@@ -365,6 +366,7 @@ def run_brkga_fuzzy(
 
         historico.append({
             "gen": gen,
+            "n_evals": algorithm.evaluator.n_eval,
             "best_makespan": best_makespan,
             "diversidade": diversidade,
             "qualidade": qualidade,
@@ -403,7 +405,7 @@ def _fracoes_para_contagens(frac_elites, frac_mutantes, pop_size):
     return n_elites, n_offsprings, n_mutantes
 
 
-def construir_objetivo(engine, pop_size=100, n_gen=100, seeds=(1, 2, 3)):
+def construir_objetivo(engine, pop_size=100, max_evals=10000, seeds=(1, 2, 3)):
     """Cria a função-objetivo do Optuna para BRKGA fixo."""
 
     def objetivo(trial):
@@ -422,7 +424,7 @@ def construir_objetivo(engine, pop_size=100, n_gen=100, seeds=(1, 2, 3)):
         makespans = []
         for seed in seeds:
             result, _ = run_brkga_fixo(
-                engine, n_gen=n_gen, seed=seed,
+                engine, max_evals=max_evals, seed=seed,
                 n_elites=n_elites, n_offsprings=n_offsprings, n_mutants=n_mutantes,
                 bias=bias,
             )
@@ -433,7 +435,7 @@ def construir_objetivo(engine, pop_size=100, n_gen=100, seeds=(1, 2, 3)):
     return objetivo
 
 
-def rodar_optuna(engine, pop_size=100, n_gen=100, seeds=(1, 2, 3), n_trials=30, seed_optuna=0):
+def rodar_optuna(engine, pop_size=100, max_evals=10000, seeds=(1, 2, 3), n_trials=30, seed_optuna=0):
     """Executa o estudo Optuna e devolve (study, melhor_config)."""
     import optuna
     from optuna.samplers import TPESampler
@@ -441,7 +443,7 @@ def rodar_optuna(engine, pop_size=100, n_gen=100, seeds=(1, 2, 3), n_trials=30, 
     sampler = TPESampler(seed=seed_optuna)
     study = optuna.create_study(direction="minimize", sampler=sampler)
     study.optimize(
-        construir_objetivo(engine, pop_size, n_gen, seeds),
+        construir_objetivo(engine, pop_size, max_evals, seeds),
         n_trials=n_trials, show_progress_bar=False
     )
 
@@ -458,7 +460,7 @@ def rodar_optuna(engine, pop_size=100, n_gen=100, seeds=(1, 2, 3), n_trials=30, 
     return study, melhor_config
 
 
-def analisar_melhor_configuracao(engine, melhor_config, n_gen=100, seeds=(10, 11, 12, 13, 14)):
+def analisar_melhor_configuracao(engine, melhor_config, max_evals=10000, seeds=(10, 11, 12, 13, 14)):
     """
     Roda a melhor configuração em várias sementes e devolve:
       - todas_metricas, trajetoria_diversidade, trajetoria_qualidade, resumo
@@ -468,7 +470,7 @@ def analisar_melhor_configuracao(engine, melhor_config, n_gen=100, seeds=(10, 11
 
     for seed in seeds:
         result, historico = run_brkga_fixo(
-            engine, n_gen=n_gen, seed=seed,
+            engine, max_evals=max_evals, seed=seed,
             n_elites=melhor_config["n_elites"],
             n_offsprings=melhor_config["n_offsprings"],
             n_mutants=melhor_config["n_mutants"],

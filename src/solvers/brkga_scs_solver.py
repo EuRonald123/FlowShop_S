@@ -178,7 +178,7 @@ def run_brkga_scs(
     step_init: float = 0.1,
     step_reduction: float = 0.5,
     min_step: float = 0.001,
-    max_generations: int = 200,
+    
     max_evals_total: int = 20000,
     seed: int = 42
 ) -> Dict[str, Any]:
@@ -197,8 +197,7 @@ def run_brkga_scs(
       z_limiar: threshold Z-Score para ativar SCS.
       votos_limiar: número de votos para ativar SCS.
       step_init, step_reduction, min_step: parâmetros do H&J.
-      max_generations: limite máximo de gerações.
-      max_evals_total: limite máximo de avaliações total.
+            max_evals_total: limite máximo de avaliações total.
       seed: semente aleatória.
 
     Retorna:
@@ -245,7 +244,7 @@ def run_brkga_scs(
     clusters: List[ClusterStateful] = []
 
     # Loop Evolutivo
-    for gen in range(max_generations):
+    while evals_count < max_evals_total:
         if evals_count >= max_evals_total or best_fitness_npfs <= lb:
             break
 
@@ -347,7 +346,7 @@ def run_brkga_scs(
         fitness_pfs = np.array([avaliar_pfs(ind) for ind in populacao])
 
         # Registra histórico de convergência
-        history_npfs.append(best_fitness_npfs)
+        history_npfs.append((evals_count, best_fitness_npfs))
 
     return {
         "best_global_pfs": best_global_pfs,

@@ -33,7 +33,7 @@ class SolverResult:
     best_perm: Optional[np.ndarray] # solução encontrada (PFS: shape (n,); NPFS: shape (m, n))
     best_cost: float                # makespan (calculado pela engine oficial)
     tardiness: float                # tardiness (calculado pela engine oficial sobre a mesma perm)
-    history: List[float]            # curva de convergência (custo × iteração/geração)
+    history: list            # curva de convergência (custo × iteração/geração)
     time_seconds: float             # tempo total de execução
     n_evaluations: int              # número de chamadas à função objetivo
     params: dict                    # hiperparâmetros usados nesta execução
@@ -165,7 +165,7 @@ def rodar_brkga(
     seed=1,
     objective="Makespan",
     version="fixo_default",
-    n_gen=100,
+    max_evals=10000,
     n_elites=20,
     n_offsprings=70,
     n_mutants=10,
@@ -192,7 +192,7 @@ def rodar_brkga(
     from src.flowshop_engine import FlowShopEngine
 
     params = {
-        "n_gen": n_gen,
+        "max_evals": max_evals,
         "n_elites": n_elites,
         "n_offsprings": n_offsprings,
         "n_mutants": n_mutants,
@@ -202,7 +202,7 @@ def rodar_brkga(
     if version == "fuzzy":
         t0 = time.time()
         result, historico = run_brkga_fuzzy(
-            engine, n_gen=n_gen, seed=seed,
+            engine, max_evals=max_evals, seed=seed,
             n_elites0=n_elites, n_offsprings0=n_offsprings,
             n_mutants0=n_mutants, bias=bias,
             frac_elites_min=frac_elites_min,
@@ -219,7 +219,7 @@ def rodar_brkga(
     else:
         t0 = time.time()
         result, historico = run_brkga_fixo(
-            engine, n_gen=n_gen, seed=seed,
+            engine, max_evals=max_evals, seed=seed,
             n_elites=n_elites, n_offsprings=n_offsprings,
             n_mutants=n_mutants, bias=bias,
             verbose=verbose,
@@ -240,7 +240,7 @@ def rodar_brkga(
     makespan, tardiness, cfo = _avaliar_na_engine(engine, best_perm, mode="NPFS")
 
     # Histórico de convergência
-    history = [h["best_makespan"] for h in historico]
+    history = [(h["n_evals"], h["best_makespan"]) for h in historico]
 
     # Lower bound
     from src.flowshop_engine import FlowShopEngine
@@ -258,7 +258,7 @@ def rodar_brkga(
         tardiness=tardiness,
         history=history,
         time_seconds=elapsed,
-        n_evaluations=n_gen * (n_elites + n_offsprings + n_mutants),
+        n_evaluations=max_evals,
         params=params,
         lower_bound=lb,
         engine_cfo_count=cfo,
@@ -483,7 +483,7 @@ def rodar_brkga_scs(
     engine,
     seed=1,
     objective="Makespan",
-    n_gen=100,
+    max_evals=10000,
     tam_pop=100,
     pe=0.2,
     pm=0.15,
@@ -507,7 +507,7 @@ def rodar_brkga_scs(
     m = engine.n_machines
 
     params = {
-        "n_gen": n_gen,
+        "max_evals": max_evals,
         "tam_pop": tam_pop,
         "pe": pe,
         "pm": pm,
@@ -518,7 +518,7 @@ def rodar_brkga_scs(
     }
 
     # Budget: igual ao BRKGA fixo para comparação justa
-    max_evals_total = n_gen * tam_pop
+    max_evals_total = max_evals
 
     # Lower bound
     lb = FlowShopEngine.calcular_lower_bound_potts(
@@ -542,7 +542,6 @@ def rodar_brkga_scs(
         step_init=step_init,
         step_reduction=step_reduction,
         min_step=min_step,
-        max_generations=n_gen * 2,  # generoso, max_evals_total para primeiro
         max_evals_total=max_evals_total,
         seed=seed,
     )
