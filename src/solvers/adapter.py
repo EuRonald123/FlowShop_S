@@ -33,7 +33,7 @@ class SolverResult:
     best_perm: Optional[np.ndarray] # solução encontrada (PFS: shape (n,); NPFS: shape (m, n))
     best_cost: float                # makespan (calculado pela engine oficial)
     tardiness: float                # tardiness (calculado pela engine oficial sobre a mesma perm)
-    history: List[float]            # curva de convergência (custo × iteração/geração)
+    history: list            # curva de convergência (custo × iteração/geração)
     time_seconds: float             # tempo total de execução
     n_evaluations: int              # número de chamadas à função objetivo
     params: dict                    # hiperparâmetros usados nesta execução
@@ -165,7 +165,7 @@ def rodar_brkga(
     seed=1,
     objective="Makespan",
     version="fixo_default",
-    n_gen=100,
+    max_evals=10000,
     n_elites=20,
     n_offsprings=70,
     n_mutants=10,
@@ -192,7 +192,7 @@ def rodar_brkga(
     from src.flowshop_engine import FlowShopEngine
 
     params = {
-        "n_gen": n_gen,
+        "max_evals": max_evals,
         "n_elites": n_elites,
         "n_offsprings": n_offsprings,
         "n_mutants": n_mutants,
@@ -202,7 +202,7 @@ def rodar_brkga(
     if version == "fuzzy":
         t0 = time.time()
         result, historico = run_brkga_fuzzy(
-            engine, n_gen=n_gen, seed=seed,
+            engine, max_evals=max_evals, seed=seed,
             n_elites0=n_elites, n_offsprings0=n_offsprings,
             n_mutants0=n_mutants, bias=bias,
             frac_elites_min=frac_elites_min,
@@ -219,7 +219,7 @@ def rodar_brkga(
     else:
         t0 = time.time()
         result, historico = run_brkga_fixo(
-            engine, n_gen=n_gen, seed=seed,
+            engine, max_evals=max_evals, seed=seed,
             n_elites=n_elites, n_offsprings=n_offsprings,
             n_mutants=n_mutants, bias=bias,
             verbose=verbose,
@@ -240,7 +240,7 @@ def rodar_brkga(
     makespan, tardiness, cfo = _avaliar_na_engine(engine, best_perm, mode="NPFS")
 
     # Histórico de convergência
-    history = [h["best_makespan"] for h in historico]
+    history = [(h["n_evals"], h["best_makespan"]) for h in historico]
 
     # Lower bound
     from src.flowshop_engine import FlowShopEngine
@@ -258,7 +258,7 @@ def rodar_brkga(
         tardiness=tardiness,
         history=history,
         time_seconds=elapsed,
-        n_evaluations=n_gen * (n_elites + n_offsprings + n_mutants),
+        n_evaluations=max_evals,
         params=params,
         lower_bound=lb,
         engine_cfo_count=cfo,
@@ -476,7 +476,124 @@ def rodar_pbil_fuzzy(
 
 
 # ============================================================================
-# 7. Função genérica: rodar_experimento
+# 7. Adapter: BRKGA-SCS (2P-BRKGA-SCS with Clustering Search)
+# ============================================================================
+
+def rodar_brkga_scs(
+    engine,
+    seed=1,
+    objective="Makespan",
+    max_evals=10000,
+    tam_pop=100,
+    pe=0.2,
+    pm=0.15,
+    rho=0.7,
+    raio_cluster=0.5,
+    z_limiar=1.5,
+    votos_limiar=5,
+    step_init=0.1,
+    step_reduction=0.5,
+    min_step=0.001,
+    verbose=False,
+) -> SolverResult:
+    """
+    Executa o 2P-BRKGA-SCS (Clustering Search + Cross-Space Knowledge Transfer)
+    e retorna SolverResult padronizado.
+    """
+    from src.solvers.brkga_scs_solver import run_brkga_scs
+    from src.flowshop_engine import FlowShopEngine
+
+    n = engine.n_jobs
+    m = engine.n_machines
+
+    params = {
+        "max_evals": max_evals,
+        "tam_pop": tam_pop,
+        "pe": pe,
+        "pm": pm,
+        "rho": rho,
+        "raio_cluster": raio_cluster,
+        "z_limiar": z_limiar,
+        "votos_limiar": votos_limiar,
+    }
+
+    # Budget: igual ao BRKGA fixo para comparação justa
+    max_evals_total = max_evals
+
+    # Lower bound
+    lb = FlowShopEngine.calcular_lower_bound_potts(
+        engine.n_jobs, engine.n_machines,
+        engine.proc_times, engine.due_dates
+    )
+
+    t0 = time.time()
+    result = run_brkga_scs(
+        n=n, m=m,
+        p_matrix=engine.proc_times,
+        due_dates=engine.due_dates,
+        lb=lb,
+        tam_pop=tam_pop,
+        pe=pe,
+        pm=pm,
+        rho=rho,
+        raio_cluster=raio_cluster,
+        z_limiar=z_limiar,
+        votos_limiar=votos_limiar,
+        step_init=step_init,
+        step_reduction=step_reduction,
+        min_step=min_step,
+        max_evals_total=max_evals_total,
+        seed=seed,
+    )
+    elapsed = time.time() - t0
+
+    # Converte NPFS keys para permutação
+    best_perm = None
+    if result["best_global_npfs"] is not None:
+        keys = result["best_global_npfs"]
+        if keys.ndim == 1:
+            keys = keys.reshape((m, n))
+        best_perm = np.zeros((m, n), dtype=int)
+        for maq in range(m):
+            best_perm[maq] = np.argsort(keys[maq])
+    elif result["best_global_pfs"] is not None:
+        # Fallback: usa solução PFS convertida para NPFS (mesma ordem em todas as máq.)
+        keys_pfs = result["best_global_pfs"]
+        best_perm = np.zeros((m, n), dtype=int)
+        for maq in range(m):
+            best_perm[maq] = np.argsort(keys_pfs)
+
+    # Avaliação com engine oficial
+    if best_perm is not None:
+        makespan, tardiness, cfo = _avaliar_na_engine(engine, best_perm, mode="NPFS")
+    else:
+        makespan = float("inf")
+        tardiness = float("inf")
+        cfo = 0
+
+    # Histórico de convergência
+    history = result.get("history", [])
+    if not history:
+        history = [makespan]
+
+    return SolverResult(
+        solver_name="BRKGA-SCS",
+        version="default",
+        mode="NPFS",
+        best_perm=best_perm,
+        best_cost=makespan,
+        tardiness=tardiness,
+        history=history,
+        time_seconds=elapsed,
+        n_evaluations=result["total_evaluations"],
+        params=params,
+        lower_bound=lb,
+        engine_cfo_count=cfo,
+    )
+
+
+# ============================================================================
+# 8. Função genérica: rodar_experimento
 # ============================================================================
 
 SOLVER_REGISTRY = {
@@ -490,6 +607,7 @@ SOLVER_REGISTRY = {
     "BRKGA_fuzzy": lambda engine, seed, **kw: rodar_brkga(
         engine, seed, version="fuzzy", **kw
     ),
+    "BRKGA_SCS": rodar_brkga_scs,
     "Neuro-BOA_adaptativo": lambda engine, seed, **kw: rodar_neuro_boa(
         engine, seed, mode="adaptativo", **kw
     ),
