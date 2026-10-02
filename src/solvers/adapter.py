@@ -488,9 +488,15 @@ def rodar_brkga_scs(
     pe=0.2,
     pm=0.15,
     rho=0.7,
-    raio_cluster=0.5,
+    # Parâmetros do Stateful Clustering Search (restaurados)
+    num_clusters_max=5,
+    r_min=0.05,
+    r_max=0.25,
+    base_cooldown=5,
+    gamma=1.5,
     z_limiar=1.5,
     votos_limiar=5,
+    # Parâmetros do Hooke & Jeeves
     step_init=0.1,
     step_reduction=0.5,
     min_step=0.001,
@@ -512,13 +518,14 @@ def rodar_brkga_scs(
         "pe": pe,
         "pm": pm,
         "rho": rho,
-        "raio_cluster": raio_cluster,
+        "num_clusters_max": num_clusters_max,
+        "r_min": r_min,
+        "r_max": r_max,
+        "base_cooldown": base_cooldown,
+        "gamma": gamma,
         "z_limiar": z_limiar,
         "votos_limiar": votos_limiar,
     }
-
-    # Budget: igual ao BRKGA fixo para comparação justa
-    max_evals_total = max_evals
 
     # Lower bound
     lb = FlowShopEngine.calcular_lower_bound_potts(
@@ -536,13 +543,17 @@ def rodar_brkga_scs(
         pe=pe,
         pm=pm,
         rho=rho,
-        raio_cluster=raio_cluster,
+        num_clusters_max=num_clusters_max,
+        r_min=r_min,
+        r_max=r_max,
+        base_cooldown=base_cooldown,
+        gamma=gamma,
         z_limiar=z_limiar,
         votos_limiar=votos_limiar,
         step_init=step_init,
         step_reduction=step_reduction,
         min_step=min_step,
-        max_evals_total=max_evals_total,
+        max_evals_total=max_evals,
         seed=seed,
     )
     elapsed = time.time() - t0
