@@ -5,7 +5,7 @@ Referência:
   - 2P-BRKGA-SCS: BRKGA com Cross-Space Knowledge Transfer via Clustering Search
     e Busca Local Hooke & Jeeves no espaço NPFS.
 
-Mecânica de Clustering restaurada do notebook original (notebooks_alunos/BRKGA_SCS.ipynb):
+Mecânica de Clustering
   - Distância de Chebyshev (L_inf) para delimitação no hipercubo [0,1]^D
   - Raio adaptativo com contração (sucesso) e expansão (falha)
   - Cooldown geométrico para evitar desperdício de CFOs em regiões estagnadas
@@ -156,7 +156,7 @@ def hooke_jeeves_local_search(
 
 
 # ============================================================================
-# 3. STATEFUL CLUSTERING SEARCH (restaurado do notebook original)
+# 3. STATEFUL CLUSTERING SEARCH
 #    - Distância de Chebyshev (L_inf)
 #    - Raio adaptativo (contração/expansão)
 #    - Cooldown geométrico
