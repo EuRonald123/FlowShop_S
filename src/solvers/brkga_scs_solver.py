@@ -113,7 +113,8 @@ def hooke_jeeves_local_search(
     step_init: float = 0.1,
     step_reduction: float = 0.5,
     min_step: float = 0.001,
-    max_evals: int = 500
+    max_evals: int = 500,
+    time_check: Optional[Callable[[], bool]] = None
 ) -> Tuple[np.ndarray, float, int]:
     """
     Hooke & Jeeves operando no espaço contínuo [0, 1]^D com clipping.
@@ -127,13 +128,15 @@ def hooke_jeeves_local_search(
     step = step_init
 
     while step > min_step and evals < max_evals:
+        if time_check is not None and time_check():
+            break
         x_novo = x_base.copy()
         melhorou = False
 
         # Movimento Exploratório
         for i in range(dim):
             for sinal in [+1, -1]:
-                if evals >= max_evals:
+                if evals >= max_evals or (time_check is not None and time_check()):
                     break
                 x_teste = x_novo.copy()
                 x_teste[i] = np.clip(x_teste[i] + sinal * step, 0.0, 1.0)
@@ -378,6 +381,7 @@ def run_brkga_scs(
     min_step: float = 0.001,
     # Orçamento e semente
     max_evals_total: int = 20000,
+    t_param: Optional[float] = None, # Parâmetro SOTA de tempo (ex: 30, 60, 90)
     seed: int = 42,
     # Parâmetros legados (mantidos para compatibilidade, mas ignorados)
     raio_cluster: float = 0.5,
@@ -414,6 +418,19 @@ def run_brkga_scs(
     np.random.seed(seed)
     evals_count = 0
     history_npfs = []  # rastreamento de convergência
+
+    # Lógica de Critério de Parada (SOTA: Tempo CPU vs CFOs)
+    t0_global = time.time()
+    usar_tempo = t_param is not None
+    t_limite_segundos = 0.0
+    if usar_tempo:
+        t_limite_segundos = (n * m * t_param / 2.0) / 1000.0
+
+    def estourou_orcamento() -> bool:
+        if usar_tempo:
+            return (time.time() - t0_global) >= t_limite_segundos
+        else:
+            return estourou_orcamento()
 
     # --- Wrappers de Avaliação (com contagem estrita de CFOs) ---
     def avaliar_pfs(sol: np.ndarray) -> float:
@@ -460,23 +477,28 @@ def run_brkga_scs(
         Retorna: (solução_npfs, fitness_npfs, evals_gastos)
         """
         cromossomo_expandido = np.tile(centro_pfs, m)
-        budget_restante = max_evals_total - evals_count
-        if budget_restante <= 0:
+        
+        if estourou_orcamento():
             return cromossomo_expandido, float('inf'), 0
 
+        # O H&J usa no máximo 500 avaliações por cluster para não ficar preso,
+        # mas também aborta se o tempo global estourar.
+        budget_restante = max_evals_total - evals_count if not usar_tempo else 500
+        
         sol_refinada, fit_refinado, evals_hj = hooke_jeeves_local_search(
             cromossomo_expandido,
             avaliar_npfs,
             step_init=step_init,
             step_reduction=step_reduction,
             min_step=min_step,
-            max_evals=min(500, budget_restante)
+            max_evals=min(500, budget_restante),
+            time_check=estourou_orcamento
         )
         return sol_refinada, fit_refinado, evals_hj
 
     # --- Loop Evolutivo (parada por orçamento de CFOs) ---
     gen = 0
-    while evals_count < max_evals_total:
+    while not estourou_orcamento():
         if best_fitness_npfs <= lb:
             break
 
@@ -509,7 +531,7 @@ def run_brkga_scs(
         std_pop = np.std(fitness_pfs) + 1e-9
 
         for i in range(n_elite):
-            if evals_count >= max_evals_total or best_fitness_npfs <= lb:
+            if estourou_orcamento() or best_fitness_npfs <= lb:
                 break
 
             elite_ind = populacao[i]
@@ -546,13 +568,13 @@ def run_brkga_scs(
             0.0, 1.0, size=(n_mutants, dim_pfs)
         )
         for i in range(n_mutants):
-            if evals_count >= max_evals_total:
+            if estourou_orcamento():
                 break
             novo_fitness[n_elite + i] = avaliar_pfs(nova_pop[n_elite + i])
 
         # Crossover (avaliados)
         for i in range(n_crossover):
-            if evals_count >= max_evals_total:
+            if estourou_orcamento():
                 break
             pai_e = populacao[np.random.randint(0, n_elite)]
             pai_ne = populacao[np.random.randint(n_elite, tam_pop)]
@@ -565,7 +587,8 @@ def run_brkga_scs(
         fitness_pfs = novo_fitness
 
         # Registra histórico de convergência (baseado em CFOs)
-        history_npfs.append((evals_count, best_fitness_npfs))
+        tempo_decorrido = time.time() - t0_global
+        history_npfs.append((evals_count, tempo_decorrido, best_fitness_npfs))
         gen += 1
 
     return {

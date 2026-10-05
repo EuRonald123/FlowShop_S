@@ -484,6 +484,7 @@ def rodar_brkga_scs(
     seed=1,
     objective="Makespan",
     max_evals=10000,
+    t_param: Optional[float] = None,
     tam_pop=100,
     pe=0.2,
     pm=0.15,
@@ -514,6 +515,7 @@ def rodar_brkga_scs(
 
     params = {
         "max_evals": max_evals,
+        "t_param": t_param,
         "tam_pop": tam_pop,
         "pe": pe,
         "pm": pm,
@@ -554,6 +556,7 @@ def rodar_brkga_scs(
         step_reduction=step_reduction,
         min_step=min_step,
         max_evals_total=max_evals,
+        t_param=t_param,
         seed=seed,
     )
     elapsed = time.time() - t0
