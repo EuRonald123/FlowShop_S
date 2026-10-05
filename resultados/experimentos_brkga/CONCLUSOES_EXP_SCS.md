@@ -1,7 +1,7 @@
 # Conclusões do Experimento: Validação do BRKGA-SCS Refatorado
 
 **Experimento realizado:** 60 instâncias *Small* (16 tarefas, 2 a 5 máquinas).
-**Algoritmo:** BRKGA-SCS puro (com Stateful Clustering restaurado, distância de Chebyshev e Cooldown).
+**Algoritmo:** BRKGA-SCS puro (com Stateful Clustering, distância de Chebyshev e Cooldown).
 **Orçamento de Avaliação:** Estrito de 50.000 CFOs (Avaliações da Função Objetivo).
 
 ---
