@@ -430,7 +430,7 @@ def run_brkga_scs(
         if usar_tempo:
             return (time.time() - t0_global) >= t_limite_segundos
         else:
-            return estourou_orcamento()
+            return evals_count >= max_evals_total
 
     # --- Wrappers de Avaliação (com contagem estrita de CFOs) ---
     def avaliar_pfs(sol: np.ndarray) -> float:
