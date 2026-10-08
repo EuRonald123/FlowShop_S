@@ -19,11 +19,6 @@ import numpy as np
 from enum import Enum
 from typing import Tuple, List, Dict, Any, Callable, Optional
 
-
-# ============================================================================
-# 1. DECODIFICADOR TWO-PHASE (PFS / NPFS)
-# ============================================================================
-
 def decodificar_two_phase(
     cromossomo: np.ndarray,
     n: int,
@@ -33,23 +28,7 @@ def decodificar_two_phase(
     modo: str = "PFS",
     obj: str = "SPAM"
 ) -> float:
-    """
-    Decodifica o cromossomo contínuo no ambiente Wait Allowed (Flow Shop).
 
-    Parâmetros:
-      - cromossomo: Vetor contínuo de Random Keys.
-                    Modo PFS  -> Tamanho N (Replicado para as M máquinas).
-                    Modo NPFS -> Tamanho N * M (ou matriz M x N).
-      - n: Número de tarefas (jobs).
-      - m: Número de máquinas.
-      - p_matrix: Matriz de tempos de processamento (N x M).
-      - due_dates: Vetor de prazos de entrega (Tamanho N). Opcional.
-      - modo: 'PFS' (mesma sequência em todas as máquinas) ou 'NPFS'.
-      - obj: 'SPAM'/'SPAN'/'CMAX'/'MAKESPAN' ou 'LMAX'/'TMAX' (atraso máximo).
-
-    Retorna:
-      - float: Valor da função objetivo calculada.
-    """
     modo_upper = modo.upper().strip()
     obj_upper = obj.upper().strip()
 
@@ -103,10 +82,7 @@ def decodificar_two_phase(
         )
 
 
-# ============================================================================
 # 2. BUSCA LOCAL HOOKE & JEEVES ADAPTADA
-# ============================================================================
-
 def hooke_jeeves_local_search(
     cromossomo_init: np.ndarray,
     avaliar_func: Callable[[np.ndarray], float],
@@ -116,9 +92,8 @@ def hooke_jeeves_local_search(
     max_evals: int = 500,
     time_check: Optional[Callable[[], bool]] = None
 ) -> Tuple[np.ndarray, float, int]:
-    """
-    Hooke & Jeeves operando no espaço contínuo [0, 1]^D com clipping.
-    """
+
+    #Hooke & Jeeves operando no espaço contínuo [0, 1]^D com clipping.
     dim = len(cromossomo_init)
     best_x = np.clip(cromossomo_init.copy(), 0.0, 1.0)
     best_fit = avaliar_func(best_x)
@@ -158,13 +133,10 @@ def hooke_jeeves_local_search(
     return best_x, best_fit, evals
 
 
-# ============================================================================
 # 3. STATEFUL CLUSTERING SEARCH
 #    - Distância de Chebyshev (L_inf)
 #    - Raio adaptativo (contração/expansão)
 #    - Cooldown geométrico
-# ============================================================================
-
 class ClusterState(Enum):
     """Estado de vida de cada cluster."""
     ACTIVE = 1       # Aceita buscas locais quando elegível
@@ -259,9 +231,6 @@ class Cluster:
 class StatefulClusteringSearch:
     """
     Gerenciador de clusters com memória de estado.
-
-    Restaurado do notebook original (notebooks_alunos/BRKGA_SCS.ipynb),
-    classe StatefulClusteringSearch (linhas 809-894).
     """
     def __init__(
         self,
@@ -353,9 +322,7 @@ class StatefulClusteringSearch:
         return individual, fitness, False, 0
 
 
-# ============================================================================
-# 4. ALGORITMO PRINCIPAL — 2P-BRKGA-SCS
-# ============================================================================
+# 4 - PRINCIPAL — 2P-BRKGA-SCS
 
 def run_brkga_scs(
     n: int,
@@ -512,7 +479,7 @@ def run_brkga_scs(
             best_fitness_pfs = fitness_pfs[0]
             best_global_pfs = populacao[0].copy()
 
-            # *** CORREÇÃO: Sincronização PFS -> NPFS ***
+            # *** CORREÇÃO Sincronização PFS -> NPFS ***
             # Se o PFS encontrou algo melhor que o NPFS atual,
             # projeta e atualiza para nunca retornar solução sub-ótima
             if best_fitness_pfs < best_fitness_npfs:

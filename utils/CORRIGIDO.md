@@ -5,7 +5,7 @@ Este documento centraliza e resume todas as correções implementadas no projeto
 ---
 
 ## 1. Critério de Parada por Orçamento (CFOs em vez de Gerações)
-**Status:** ✅ Concluído  
+**Status:** Concluído  
 **Arquivos modificados:** `brkga_scs_solver.py`, `brkga_solver.py`, `adapter.py`, `brkga_foco_v2.ipynb`
 
 **Problema original:**  
@@ -19,7 +19,7 @@ O código usava `n_gen` (número de gerações) como critério de parada. Porém
 ---
 
 ## 2. Correção da Telemetria (cfo_count = 2) no CSV
-**Status:** ✅ Concluído  
+**Status:** Concluído  
 **Arquivos modificados:** `brkga_foco_v2.ipynb`, `adapter.py`
 
 **Problema original:**  
@@ -33,7 +33,7 @@ O CSV gravava `cfo_count = 2` para todas as execuções do BRKGA-SCS. Isso acont
 ---
 
 ## 3. Restauração do Stateful Clustering Search
-**Status:** ✅ Concluído  
+**Status:** Concluído  
 **Arquivos modificados:** `brkga_scs_solver.py`
 
 **Problema original:**  
@@ -53,7 +53,7 @@ O solver extraído do notebook original usava uma versão simplificada e incompl
 ---
 
 ## 4. Sincronização PFS ↔ NPFS (Makespan)
-**Status:** ✅ Concluído  
+**Status:** Concluído  
 **Arquivos modificados:** `brkga_scs_solver.py`
 
 **Problema original:**  
@@ -65,7 +65,7 @@ O `best_fitness_npfs` só era atualizado quando a busca local (Hooke & Jeeves) e
 ---
 
 ## 5. Eliminação de Reavaliação de Elites
-**Status:** ✅ Concluído  
+**Status:** Concluído  
 **Arquivos modificados:** `brkga_scs_solver.py`
 
 **Problema original:**  
@@ -78,7 +78,7 @@ Na virada de geração, o código fazia `fitness_pfs = np.array([avaliar_pfs(ind
 ---
 
 ## 6. Atualização do Adapter
-**Status:** ✅ Concluído  
+**Status:** Concluído  
 **Arquivos modificados:** `adapter.py`
 
 **O que foi corrigido:**  
