@@ -1,14 +1,12 @@
 """
 Solver 2P-BRKGA-SCS (Clustering Search + Cross-Space Knowledge Transfer).
 
-Referência:
-  - 2P-BRKGA-SCS: BRKGA com Cross-Space Knowledge Transfer via Clustering Search
+BRKGA-SCS: BRKGA com Cross-Space Knowledge Transfer via Clustering Search
     e Busca Local Hooke & Jeeves no espaço NPFS.
 
 Mecânica de Clustering
   - Distância de Chebyshev (L_inf) para delimitação no hipercubo [0,1]^D
   - Raio adaptativo com contração (sucesso) e expansão (falha)
-  - Cooldown geométrico para evitar desperdício de CFOs em regiões estagnadas
   - Sincronização PFS/NPFS para nunca retornar solução sub-ótima
   - Eliminação de reavaliação de elites copiados entre gerações
 """
@@ -147,9 +145,6 @@ class ClusterState(Enum):
 class Cluster:
     """
     Cluster individual com memória de estado completa.
-
-    Restaurado do notebook original (notebooks_alunos/BRKGA_SCS.ipynb),
-    classe Cluster (linhas 738-806).
     """
     def __init__(
         self,
@@ -195,7 +190,8 @@ class Cluster:
             self.cooldown_ticks -= 1
             if self.cooldown_ticks <= 0:
                 self.state = ClusterState.ACTIVE
-
+                
+    #Busca local: registra resultado e ajusta raio/cooldown
     def register_local_search_result(
         self, improved: bool, new_centroid: np.ndarray, new_fitness: float
     ):
@@ -214,13 +210,13 @@ class Cluster:
             self.cooldown_ticks = 0
 
             # Contração adaptativa do raio
-            self.radius = max(self.r_min, self.radius * 0.9)
+            self.radius = max(self.r_min, self.radius * 0.9) # contrai em 10%
         else:
-            # Falha: região possivelmente esgotada
+            # Falha -> região possivelmente esgotada
             self.stagnation_count += 1
 
             # Expansão adaptativa para tentar vizinhos mais distantes
-            self.radius = min(self.r_max, self.radius * 1.1)
+            self.radius = min(self.r_max, self.radius * 1.1) # expande em 10%
 
             # Cooldown geométrico: base * gamma^estagnacao
             cd = int(self.base_cooldown * (self.gamma ** self.stagnation_count))
@@ -334,7 +330,7 @@ def run_brkga_scs(
     pe: float = 0.2,         # fração de elites
     pm: float = 0.15,        # fração de mutantes
     rho: float = 0.7,        # viés do crossover
-    # Parâmetros do Clustering (novos, restaurados do original)
+    # Parâmetros do Clustering
     num_clusters_max: int = 5,
     r_min: float = 0.05,
     r_max: float = 0.25,
@@ -350,38 +346,11 @@ def run_brkga_scs(
     max_evals_total: int = 20000,
     t_param: Optional[float] = None, # Parâmetro SOTA de tempo (ex: 30, 60, 90)
     seed: int = 42,
-    # Parâmetros legados (mantidos para compatibilidade, mas ignorados)
+    #NAO USADO -> ANTIGO RAIO
     raio_cluster: float = 0.5,
-) -> Dict[str, Any]:
-    """
-    Executa o 2P-BRKGA-SCS com Cross-Space Knowledge Transfer e Duplo Best Tracking.
+):
 
-    Parâmetros:
-      n, m, p_matrix, due_dates: dados da instância.
-      lb: Lower Bound para early stopping.
-      tam_pop: tamanho da população.
-      pe: fração de elites (0..1).
-      pm: fração de mutantes (0..1).
-      rho: probabilidade de herdar gene do pai elite no crossover.
-      num_clusters_max: número máximo de clusters simultâneos.
-      r_min, r_max: limites do raio adaptativo.
-      base_cooldown, gamma: parâmetros do cooldown geométrico.
-      z_limiar: threshold Z-Score para ativar SCS.
-      votos_limiar: número de votos para ativar SCS.
-      step_init, step_reduction, min_step: parâmetros do H&J.
-      max_evals_total: orçamento estrito de avaliações (CFOs).
-      seed: semente aleatória.
 
-    Retorna:
-      dict com:
-        - best_global_pfs: melhor solução no espaço PFS (n,)
-        - best_fitness_pfs: makespan da melhor PFS
-        - best_global_npfs: melhor solução no espaço NPFS (n*m,)
-        - best_fitness_npfs: makespan da melhor NPFS
-        - total_evaluations: total de avaliações usadas
-        - lower_bound: LB da instância
-        - history: lista de (evals, best_fitness_npfs) para convergência
-    """
     np.random.seed(seed)
     evals_count = 0
     history_npfs = []  # rastreamento de convergência
@@ -393,19 +362,19 @@ def run_brkga_scs(
     if usar_tempo:
         t_limite_segundos = (n * m * t_param / 2.0) / 1000.0
 
-    def estourou_orcamento() -> bool:
+    def estourou_orcamento():
         if usar_tempo:
             return (time.time() - t0_global) >= t_limite_segundos
         else:
             return evals_count >= max_evals_total
 
     # --- Wrappers de Avaliação (com contagem estrita de CFOs) ---
-    def avaliar_pfs(sol: np.ndarray) -> float:
+    def avaliar_pfs(sol: np.ndarray):
         nonlocal evals_count
         evals_count += 1
         return decodificar_two_phase(sol, n, m, p_matrix, due_dates, modo="PFS", obj="SPAM")
 
-    def avaliar_npfs(sol: np.ndarray) -> float:
+    def avaliar_npfs(sol: np.ndarray):
         nonlocal evals_count
         evals_count += 1
         return decodificar_two_phase(sol, n, m, p_matrix, due_dates, modo="NPFS", obj="SPAM")
@@ -426,7 +395,7 @@ def run_brkga_scs(
     populacao = np.random.uniform(0.0, 1.0, size=(tam_pop, dim_pfs))
     fitness_pfs = np.array([avaliar_pfs(ind) for ind in populacao])
 
-    # --- Inicialização do Stateful Clustering Search (restaurado) ---
+    # --- Inicialização do Stateful Clustering Search ---
     scs = StatefulClusteringSearch(
         num_clusters_max=num_clusters_max,
         r_min=r_min,
@@ -438,7 +407,7 @@ def run_brkga_scs(
     # --- Função de Busca Local para o SCS (Cross-Space: PFS -> NPFS) ---
     def local_search_fn(
         centro_pfs: np.ndarray, fitness_centro: float
-    ) -> Tuple[np.ndarray, float, int]:
+    ):
         """
         Projeta o centro PFS para NPFS via np.tile e refina com Hooke & Jeeves.
         Retorna: (solução_npfs, fitness_npfs, evals_gastos)
