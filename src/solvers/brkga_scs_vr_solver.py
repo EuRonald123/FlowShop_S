@@ -5,7 +5,7 @@ import math
 import time
 import numpy as np
 import random
-from typing import Tuple, List, Dict, Any, Callable
+from typing import Tuple, List, Dict, Any, Callable, Optional
 from dataclasses import dataclass
 
 # =====================================================================
@@ -24,20 +24,27 @@ class Config:
     step_reduction: float = 0.5
     min_step: float = 0.001
     max_hj_evals: int = 600
-    max_generations: int = 200
+    max_generations: int = 129999
     max_evals_total: int = 20000
-    obj: str = "LMAX"
+    t_param: Optional[float] = None
+    obj: str = "SPAM"
 
 class BudgetManager:
-    def __init__(self, max_evals: int):
+    def __init__(self, max_evals: int, t_limite_segundos: Optional[float] = None):
         self.max_evals = max_evals
+        self.t_limite_segundos = t_limite_segundos
+        self.t0_global = time.time()
         self.evals_count = 0
 
     def increment_eval(self, count: int = 1):
         self.evals_count += count
 
     def is_exhausted(self, current_best: float, lb: float) -> bool:
-        return self.evals_count >= self.max_evals or current_best <= lb
+        if current_best <= lb:
+            return True
+        if self.t_limite_segundos is not None:
+            return (time.time() - self.t0_global) >= self.t_limite_segundos
+        return self.evals_count >= self.max_evals
 
 class ClusterStateful:
     def __init__(self, centro: np.ndarray, fitness: float):
@@ -46,61 +53,7 @@ class ClusterStateful:
         self.fitness_centro = fitness
 
 # =====================================================================
-# 2. LEITURA DE INSTÂNCIAS E CÁLCULO DE LOWER BOUND (CÓDIGO ANTIGO)
-# =====================================================================
-def ler_instancia(caminho_arquivo: str):
-    with open(caminho_arquivo, 'r') as f:
-        linhas = [linha.strip() for linha in f if linha.strip()]
-
-    dimensoes = list(map(int, linhas[0].split()))
-    n, m = dimensoes[0], dimensoes[1]
-    p_matrix = np.zeros((n, m), dtype=float)
-
-    idx = 2
-    for j in range(n):
-        valores = list(map(int, linhas[idx].split()))
-        p_matrix[j, :] = valores[1::2][:m]
-        idx += 1
-
-    due_dates = None
-    duedate_encontrado = False
-
-    while idx < len(linhas):
-        if "duedate" in linhas[idx].lower():
-            duedate_encontrado = True
-            idx += 1
-            break
-        idx += 1
-
-    if duedate_encontrado:
-        valores_dd = []
-        while idx < len(linhas) and len(valores_dd) < n:
-            nums = list(map(float, linhas[idx].split()))
-            valores_dd.extend(nums)
-            idx += 1
-        due_dates = np.array(valores_dd[:n], dtype=float)
-
-    return n, m, p_matrix, due_dates
-
-def calcular_lower_bound_potts(p_matrix: np.ndarray, due_dates: np.ndarray) -> int:
-    n, m = p_matrix.shape
-    lb_por_maquina = []
-
-    for maq in range(m):
-        r = np.sum(p_matrix[:, :maq], axis=1) if maq > 0 else np.zeros(n)
-        q = np.sum(p_matrix[:, maq + 1:], axis=1) if maq < m - 1 else np.zeros(n)
-        due_dates_modificados = due_dates - q
-        carga_total_maquina = np.sum(p_matrix[:, maq])
-        min_r = np.min(r)
-
-        lb_m = max(0, min_r + carga_total_maquina - np.max(due_dates_modificados))
-        lb_por_maquina.append(lb_m)
-
-    lb_jobs = np.max(np.maximum(0, np.sum(p_matrix, axis=1) - due_dates))
-    return int(max(np.max(lb_por_maquina), lb_jobs))
-
-# =====================================================================
-# 3. DECODIFICADOR TWO-PHASE (CÓDIGO ANTIGO + argsort)
+# 2. DECODIFICADOR TWO-PHASE (CÓDIGO ANTIGO + argsort)
 # =====================================================================
 def decodificar_two_phase(
     cromossomo: np.ndarray, n: int, m: int,
@@ -143,7 +96,7 @@ def decodificar_two_phase(
         return float(np.max(atrasos))
 
 # =====================================================================
-# 4. BUSCA LOCAL: COORDINATE DESCENT (Mecânica Antiga + Budget Nova)
+# 3. BUSCA LOCAL: COORDINATE DESCENT (Mecânica Antiga + Budget Nova)
 # =====================================================================
 def local_search_coordinate_descent(
     x_init: np.ndarray, eval_fn: Callable[[np.ndarray], float],
@@ -198,15 +151,24 @@ def local_search_coordinate_descent(
     return x_best, f_best
 
 # =====================================================================
-# 5. ALGORITMO PRINCIPAL (2P-BRKGA-SCS HÍBRIDO)
+# 4. ALGORITMO PRINCIPAL (2P-BRKGA-SCS HÍBRIDO)
 # =====================================================================
 def run_brkga_scs_hybrid(
     n: int, m: int, p_matrix: np.ndarray, due_dates: np.ndarray,
     lb: int, config: Config, seed: int = 42
 ) -> Dict[str, Any]:
 
-    np.random.seed(int(time.time()))
-    budget_mgr = BudgetManager(max_evals=config.max_evals_total)
+    np.random.seed(seed)
+    history_npfs = []
+
+    t_limite_segundos = None
+    if config.t_param is not None:
+        t_limite_segundos = (n * m * config.t_param / 2.0) / 1000.0
+
+    budget_mgr = BudgetManager(
+        max_evals=config.max_evals_total,
+        t_limite_segundos=t_limite_segundos
+    )
 
     # Wrappers que incrementam o budget automaticamente
     def avaliar_pfs(sol: np.ndarray) -> float:
@@ -304,7 +266,6 @@ def run_brkga_scs_hybrid(
                 if fit_refinado < best_fitness_npfs:
                     best_fitness_npfs = fit_refinado
                     best_global_npfs = sol_refinada.copy()
-                    print(f"[Gen {gen}] Novo Best NPFS encontrado via Busca Local: {best_fitness_npfs}")
 
                 c.votos = 0
 
@@ -330,42 +291,15 @@ def run_brkga_scs_hybrid(
                 break
             fitness_pfs[i] = avaliar_pfs(populacao[i])
 
+        tempo_decorrido = time.time() - budget_mgr.t0_global
+        history_npfs.append((budget_mgr.evals_count, tempo_decorrido, best_fitness_npfs))
+
     return {
         "best_global_pfs": best_global_pfs,
         "best_fitness_pfs": best_fitness_pfs,
         "best_global_npfs": best_global_npfs,
         "best_fitness_npfs": best_fitness_npfs,
         "total_evaluations": budget_mgr.evals_count,
-        "lower_bound": lb
+        "lower_bound": lb,
+        "history": history_npfs,
     }
-
-# =====================================================================
-# EXECUÇÃO DE TESTE
-# =====================================================================
-if __name__ == "__main__":
-    caminho = "/content/drive/MyDrive/instances/Large/Ta101_2.txt"
-    # caminho = "I_2_16_5_1.txt" # Altere para testar local
-
-    n_test, m_test, p_matrix_test, due_dates_test = ler_instancia(caminho)
-    lb_test = calcular_lower_bound_potts(p_matrix_test, due_dates_test)
-
-    print(f"Lower Bound Calculado (McMahon-Florian/Potts): {lb_test}")
-
-    # Inicializa a classe de Configuração herdando os parâmetros do seu código base
-    cfg = Config(
-        max_evals_total = n_test * m_test * 100,
-        max_generations = 129999,
-        obj = "SPAM"
-    )
-
-    resultado = run_brkga_scs_hybrid(
-        n=n_test, m=m_test,
-        p_matrix=p_matrix_test, due_dates=due_dates_test,
-        lb=lb_test, config=cfg
-    )
-
-    print("\n================ RESULTADOS DOS DOIS ESPAÇOS ================")
-    print(f"PFS Best Fitness (BRKGA Macro) : {resultado['best_fitness_pfs']}")
-    print(f"NPFS Best Fitness (SCS Micro)  : {resultado['best_fitness_npfs']}")
-    print(f"Avaliações Totais Utilizadas   : {resultado['total_evaluations']}")
-    print("=============================================================")

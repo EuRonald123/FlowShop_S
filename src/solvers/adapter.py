@@ -479,7 +479,7 @@ def rodar_pbil_fuzzy(
 # 7. Adapter: BRKGA-SCS (2P-BRKGA-SCS with Clustering Search)
 # ============================================================================
 
-def rodar_brkga_scs(
+def rodar_brkga_scs_vm(
     engine,
     seed=1,
     objective="Makespan",
@@ -507,7 +507,7 @@ def rodar_brkga_scs(
     Executa o 2P-BRKGA-SCS (Clustering Search + Cross-Space Knowledge Transfer)
     e retorna SolverResult padronizado.
     """
-    from solvers.brkga_scs_vm_solver import run_brkga_scs
+    from src.solvers.brkga_scs_vm_solver import run_brkga_scs
     from src.flowshop_engine import FlowShopEngine
 
     n = engine.n_jobs
@@ -592,7 +592,131 @@ def rodar_brkga_scs(
 
     return SolverResult(
         solver_name="BRKGA-SCS",
-        version="default",
+        version="vm",
+        mode="NPFS",
+        best_perm=best_perm,
+        best_cost=makespan,
+        tardiness=tardiness,
+        history=history,
+        time_seconds=elapsed,
+        n_evaluations=result["total_evaluations"],
+        params=params,
+        lower_bound=lb,
+        engine_cfo_count=cfo,
+    )
+
+
+def rodar_brkga_scs_vr(
+    engine,
+    seed=1,
+    objective="Makespan",
+    max_evals=10000,
+    t_param: Optional[float] = None,
+    tam_pop=100,
+    pe=0.15,
+    pm=0.25,
+    rho=0.85,
+    raio_cluster=0.5,
+    z_limiar=1.645,
+    votos_limiar=5,
+    step_init=0.1,
+    step_reduction=0.5,
+    min_step=0.001,
+    max_hj_evals=600,
+    max_generations=129999,
+    verbose=False,
+) -> SolverResult:
+    """
+    Executa o 2P-BRKGA-SCS Versão Revisada (brkga_scs_vr_solver)
+    e retorna SolverResult padronizado.
+    """
+    from src.solvers.brkga_scs_vr_solver import run_brkga_scs_hybrid, Config
+    from src.flowshop_engine import FlowShopEngine
+
+    n = engine.n_jobs
+    m = engine.n_machines
+
+    obj_map = "SPAM" if objective.upper() in ["MAKESPAN", "SPAM", "SPAN", "CMAX"] else "LMAX"
+
+    cfg = Config(
+        tam_pop=tam_pop,
+        pe=pe,
+        pm=pm,
+        rho=rho,
+        raio_cluster=raio_cluster,
+        z_limiar=z_limiar,
+        votos_limiar=votos_limiar,
+        step_init=step_init,
+        step_reduction=step_reduction,
+        min_step=min_step,
+        max_hj_evals=max_hj_evals,
+        max_generations=max_generations,
+        max_evals_total=max_evals,
+        t_param=t_param,
+        obj=obj_map,
+    )
+
+    params = {
+        "max_evals": max_evals,
+        "t_param": t_param,
+        "tam_pop": tam_pop,
+        "pe": pe,
+        "pm": pm,
+        "rho": rho,
+        "raio_cluster": raio_cluster,
+        "z_limiar": z_limiar,
+        "votos_limiar": votos_limiar,
+        "step_init": step_init,
+        "step_reduction": step_reduction,
+        "min_step": min_step,
+        "max_hj_evals": max_hj_evals,
+        "max_generations": max_generations,
+    }
+
+    lb = FlowShopEngine.calcular_lower_bound_potts(
+        engine.n_jobs, engine.n_machines,
+        engine.proc_times, engine.due_dates
+    )
+
+    t0 = time.time()
+    result = run_brkga_scs_hybrid(
+        n=n, m=m,
+        p_matrix=engine.proc_times,
+        due_dates=engine.due_dates,
+        lb=lb,
+        config=cfg,
+        seed=seed,
+    )
+    elapsed = time.time() - t0
+
+    best_perm = None
+    if result["best_global_npfs"] is not None:
+        keys = result["best_global_npfs"]
+        if keys.ndim == 1:
+            keys = keys.reshape((m, n))
+        best_perm = np.zeros((m, n), dtype=int)
+        for maq in range(m):
+            best_perm[maq] = np.argsort(keys[maq])
+    elif result["best_global_pfs"] is not None:
+        keys_pfs = result["best_global_pfs"]
+        best_perm = np.zeros((m, n), dtype=int)
+        for maq in range(m):
+            best_perm[maq] = np.argsort(keys_pfs)
+
+    if best_perm is not None:
+        makespan, tardiness, cfo = _avaliar_na_engine(engine, best_perm, mode="NPFS")
+    else:
+        makespan = float("inf")
+        tardiness = float("inf")
+        cfo = 0
+
+    history = result.get("history", [])
+    if not history:
+        history = [makespan]
+
+    return SolverResult(
+        solver_name="BRKGA-SCS",
+        version="vr",
         mode="NPFS",
         best_perm=best_perm,
         best_cost=makespan,
@@ -611,6 +735,15 @@ def rodar_brkga_scs(
 # ============================================================================
 
 SOLVER_REGISTRY = {
+    
+    "BRKGA_SCS": rodar_brkga_scs_vm,
+    "BRKGA_SCS_VR": rodar_brkga_scs_vr,
+    
+    
+    
+    
+    
+    #ESQUECIDOS ;-;
     "ACO": rodar_aco,
     "BRKGA_fixo_default": lambda engine, seed, **kw: rodar_brkga(
         engine, seed, version="fixo_default", **kw
@@ -621,7 +754,6 @@ SOLVER_REGISTRY = {
     "BRKGA_fuzzy": lambda engine, seed, **kw: rodar_brkga(
         engine, seed, version="fuzzy", **kw
     ),
-    "BRKGA_SCS": rodar_brkga_scs,
     "Neuro-BOA_adaptativo": lambda engine, seed, **kw: rodar_neuro_boa(
         engine, seed, mode="adaptativo", **kw
     ),
