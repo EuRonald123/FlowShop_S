@@ -1,16 +1,3 @@
-"""
-Solver 2P-BRKGA-SCS (Clustering Search + Cross-Space Knowledge Transfer).
-
-BRKGA-SCS: BRKGA com Cross-Space Knowledge Transfer via Clustering Search
-    e Busca Local Hooke & Jeeves no espaço NPFS.
-
-Mecânica de Clustering
-  - Distância de Chebyshev (L_inf) para delimitação no hipercubo [0,1]^D
-  - Raio adaptativo com contração (sucesso) e expansão (falha)
-  - Sincronização PFS/NPFS para nunca retornar solução sub-ótima
-  - Eliminação de reavaliação de elites copiados entre gerações
-"""
-
 import time
 import math
 import numpy as np
@@ -176,11 +163,11 @@ class Cluster:
 
         self.membros_count = 1
 
-    def chebyshev_distance(self, individual: np.ndarray) -> float:
+    def chebyshev_distance(self, individual: np.ndarray):
         """Distância L_infinito (Chebyshev) entre o indivíduo e o centroide."""
         return float(np.max(np.abs(self.centroid - individual)))
 
-    def is_inside(self, individual: np.ndarray) -> bool:
+    def is_inside(self, individual: np.ndarray):
         """Verifica se o indivíduo está dentro da vizinhança hipercúbica."""
         return self.chebyshev_distance(individual) <= self.radius
 
@@ -417,9 +404,9 @@ def run_brkga_scs(
         if estourou_orcamento():
             return cromossomo_expandido, float('inf'), 0
 
-        # O H&J usa no máximo 500 avaliações por cluster para não ficar preso,
+        # O H&J usa no máximo 500 avaliações por cluster para não ficar preso,   
         # mas também aborta se o tempo global estourar.
-        budget_restante = max_evals_total - evals_count if not usar_tempo else 500
+        budget_restante = max_evals_total - evals_count if not usar_tempo else 500   #substituir por n * m * fator****
         
         sol_refinada, fit_refinado, evals_hj = hooke_jeeves_local_search(
             cromossomo_expandido,
