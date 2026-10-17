@@ -48,6 +48,46 @@ class FlowShopEngine:
             raise ValueError(f"Instância malformada: {caminho_arquivo}")
 
         return num_jobs, num_machines, p_matrix, np.array(due_dates)
+    
+    #Carregar as instancias do Taillard lá
+    @staticmethod
+    def carregar_instancia_taillard(caminho_arquivo):
+        if not os.path.exists(caminho_arquivo):
+            raise FileNotFoundError(f"Instância Taillard não encontrada: {caminho_arquivo}")
+
+        with open(caminho_arquivo, "r") as f:
+            linhas = [l.strip() for l in f if l.strip()]
+
+        try:
+            # A linha 0 é "number of jobs...", A linha 1 tem os dados
+            partes_dimensoes = linhas[1].split()
+            num_jobs = int(partes_dimensoes[0])
+            num_machines = int(partes_dimensoes[1])
+
+            p_matrix = np.zeros((num_jobs, num_machines), dtype=int)
+
+            # A matriz do Taillard começa na linha 3 (após "processing times :")
+            idx = 3
+            for maq in range(num_machines):
+                # Como instâncias grandes quebram linha, lemos até fechar a máquina
+                tempos_maquina = []
+                while len(tempos_maquina) < num_jobs:
+                    tempos_maquina.extend([int(x) for x in linhas[idx].split()])
+                    idx += 1
+
+                for j in range(num_jobs):
+                    p_matrix[j, maq] = tempos_maquina[j]
+            
+            # O Taillard de Makespan não tem due dates. Usando dummy zeros.
+            due_dates = np.zeros(num_jobs, dtype=int)
+
+            return num_jobs, num_machines, p_matrix, due_dates
+
+        except Exception as e:
+            raise ValueError(f"Erro ao processar arquivo Taillard {caminho_arquivo}: {e}")
+
+
+
 
     @staticmethod
     def calcular_lower_bound_potts(num_jobs, num_machines, p_matrix, due_dates):
