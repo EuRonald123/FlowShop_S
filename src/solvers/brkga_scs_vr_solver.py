@@ -33,7 +33,6 @@ def decodificar_two_phase(
     else:
         raise ValueError(f"Modo '{modo}' inválido. Utilize 'PFS' ou 'NPFS'.")
 
-    # 2. Simulação do Chão de Fábrica (Wait Allowed)
     completion_time = np.zeros((n, m), dtype=float)
 
     # Máquina 0 (Primeiro Estágio)

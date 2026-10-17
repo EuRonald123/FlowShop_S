@@ -490,7 +490,7 @@ def rodar_brkga_scs(
     pm=0.15,
     rho=0.7,
     # Parâmetros do Stateful Clustering Search (restaurados)
-    num_clusters_max=5,
+    num_clusters_max=5, #pq 5? E se eu testar com mais?
     r_min=0.05,
     r_max=0.25,
     base_cooldown=5,
