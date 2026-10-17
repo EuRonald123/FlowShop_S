@@ -507,7 +507,7 @@ def rodar_brkga_scs(
     Executa o 2P-BRKGA-SCS (Clustering Search + Cross-Space Knowledge Transfer)
     e retorna SolverResult padronizado.
     """
-    from solvers.brkga_scs_vr_solver import run_brkga_scs
+    from solvers.brkga_scs_vm_solver import run_brkga_scs
     from src.flowshop_engine import FlowShopEngine
 
     n = engine.n_jobs
