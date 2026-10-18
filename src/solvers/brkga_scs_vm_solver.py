@@ -263,7 +263,7 @@ class StatefulClusteringSearch:
             # Dispara busca local no primeiro cluster
             ls_sol, ls_fit, ls_evals = local_search_fn(individual, fitness)
             improved = ls_fit < fitness
-            new_cluster.register_local_search_result(improved, ls_sol, ls_fit)
+            new_cluster.register_local_search_result(improved, individual, ls_fit)
             return ls_sol, ls_fit, True, ls_evals
 
         # Encontra o cluster mais próximo usando Chebyshev
@@ -280,7 +280,7 @@ class StatefulClusteringSearch:
             if closest_cluster.state == ClusterState.ACTIVE:
                 ls_sol, ls_fit, ls_evals = local_search_fn(individual, fitness)
                 improved = ls_fit < fitness or ls_fit < closest_cluster.best_fitness
-                closest_cluster.register_local_search_result(improved, ls_sol, ls_fit)
+                closest_cluster.register_local_search_result(improved, individual, ls_fit)
                 return ls_sol, ls_fit, True, ls_evals
             else:
                 # Cluster em COOLDOWN: economiza avaliações
@@ -298,7 +298,7 @@ class StatefulClusteringSearch:
                 # Busca local no centroide da nova região
                 ls_sol, ls_fit, ls_evals = local_search_fn(individual, fitness)
                 improved = ls_fit < fitness
-                new_cluster.register_local_search_result(improved, ls_sol, ls_fit)
+                new_cluster.register_local_search_result(improved, individual, ls_fit)
                 return ls_sol, ls_fit, True, ls_evals
 
         return individual, fitness, False, 0
