@@ -27,7 +27,7 @@ class Config:
     max_generations: int = 129999
     max_evals_total: int = 20000
     t_param: Optional[float] = None
-    obj: str = "SPAM"
+    obj: str = "Makespan"
 
 class BudgetManager:
     def __init__(self, max_evals: int, t_limite_segundos: Optional[float] = None):
@@ -51,49 +51,6 @@ class ClusterStateful:
         self.centro = centro.copy()
         self.votos = 1
         self.fitness_centro = fitness
-
-# =====================================================================
-# 2. DECODIFICADOR TWO-PHASE (CÓDIGO ANTIGO + argsort)
-# =====================================================================
-def decodificar_two_phase(
-    cromossomo: np.ndarray, n: int, m: int,
-    p_matrix: np.ndarray, due_dates: np.ndarray = None,
-    modo: str = "PFS", obj: str = "LMAX"
-) -> float:
-    modo_upper = modo.upper().strip()
-    obj_upper = obj.upper().strip()
-
-    if modo_upper == "PFS":
-        seq_unica = np.argsort(cromossomo[:n])
-        ordens_maquinas = [seq_unica for _ in range(m)]
-    elif modo_upper == "NPFS":
-        if cromossomo.ndim == 1:
-            chaves_maquinas = cromossomo[:n * m].reshape((m, n))
-        else:
-            chaves_maquinas = cromossomo
-        ordens_maquinas = [np.argsort(chaves_maquinas[maq, :]) for maq in range(m)]
-    else:
-        raise ValueError("Modo inválido.")
-
-    completion_time = np.zeros((n, m), dtype=float)
-    tempo_maq = 0.0
-    for job in ordens_maquinas[0]:
-        tempo_maq += p_matrix[job, 0]
-        completion_time[job, 0] = tempo_maq
-
-    for maq in range(1, m):
-        tempo_maq = 0.0
-        for job in ordens_maquinas[maq]:
-            pronto_job = completion_time[job, maq - 1]
-            inicio = max(tempo_maq, pronto_job)
-            completion_time[job, maq] = inicio + p_matrix[job, maq]
-            tempo_maq = completion_time[job, maq]
-
-    if obj_upper in ["SPAM", "SPAN", "CMAX", "MAKESPAN"]:
-        return float(np.max(completion_time[:, m - 1]))
-    elif obj_upper in ["LMAX", "TMAX"]:
-        atrasos = np.maximum(0.0, completion_time[:, m - 1] - due_dates)
-        return float(np.max(atrasos))
 
 # =====================================================================
 # 3. BUSCA LOCAL: COORDINATE DESCENT (Mecânica Antiga + Budget Nova)
@@ -154,8 +111,12 @@ def local_search_coordinate_descent(
 # 4. ALGORITMO PRINCIPAL (2P-BRKGA-SCS HÍBRIDO)
 # =====================================================================
 def run_brkga_scs_hybrid(
-    n: int, m: int, p_matrix: np.ndarray, due_dates: np.ndarray,
-    lb: int, config: Config, seed: int = 42
+    engine,
+    n: int,
+    m: int,
+    lb: int,
+    config: Config,
+    seed: int = 42
 ) -> Dict[str, Any]:
 
     np.random.seed(seed)
@@ -173,11 +134,11 @@ def run_brkga_scs_hybrid(
     # Wrappers que incrementam o budget automaticamente
     def avaliar_pfs(sol: np.ndarray) -> float:
         budget_mgr.increment_eval(1)
-        return decodificar_two_phase(sol, n, m, p_matrix, due_dates, modo="PFS", obj=config.obj)
+        return engine.evaluate(sol, mode="PFS", objective=config.obj)
 
     def avaliar_npfs(sol: np.ndarray) -> float:
         budget_mgr.increment_eval(1)
-        return decodificar_two_phase(sol, n, m, p_matrix, due_dates, modo="NPFS", obj=config.obj)
+        return engine.evaluate(sol, mode="NPFS", objective=config.obj)
 
     best_global_pfs = None
     best_fitness_pfs = float('inf')

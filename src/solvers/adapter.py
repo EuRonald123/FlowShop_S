@@ -507,7 +507,7 @@ def rodar_brkga_scs_vm(
     Executa o 2P-BRKGA-SCS (Clustering Search + Cross-Space Knowledge Transfer)
     e retorna SolverResult padronizado.
     """
-    from src.solvers.brkga_scs_vm_solver import run_brkga_scs
+    from src.solvers.brkga_scs_vm_solver import run_brkga_scs_vm
     from src.flowshop_engine import FlowShopEngine
 
     n = engine.n_jobs
@@ -536,11 +536,11 @@ def rodar_brkga_scs_vm(
     )
 
     t0 = time.time()
-    result = run_brkga_scs(
+    result = run_brkga_scs_vm(
+        engine=engine,
         n=n, m=m,
-        p_matrix=engine.proc_times,
-        due_dates=engine.due_dates,
         lb=lb,
+        objective=objective,
         tam_pop=tam_pop,
         pe=pe,
         pm=pm,
@@ -636,8 +636,6 @@ def rodar_brkga_scs_vr(
     n = engine.n_jobs
     m = engine.n_machines
 
-    obj_map = "SPAM" if objective.upper() in ["MAKESPAN", "SPAM", "SPAN", "CMAX"] else "LMAX"
-
     cfg = Config(
         tam_pop=tam_pop,
         pe=pe,
@@ -653,7 +651,7 @@ def rodar_brkga_scs_vr(
         max_generations=max_generations,
         max_evals_total=max_evals,
         t_param=t_param,
-        obj=obj_map,
+        obj=objective,
     )
 
     params = {
@@ -680,9 +678,8 @@ def rodar_brkga_scs_vr(
 
     t0 = time.time()
     result = run_brkga_scs_hybrid(
+        engine=engine,
         n=n, m=m,
-        p_matrix=engine.proc_times,
-        due_dates=engine.due_dates,
         lb=lb,
         config=cfg,
         seed=seed,
@@ -738,9 +735,6 @@ SOLVER_REGISTRY = {
     
     "BRKGA_SCS": rodar_brkga_scs_vm,
     "BRKGA_SCS_VR": rodar_brkga_scs_vr,
-    
-    
-    
     
     
     #ESQUECIDOS ;-;

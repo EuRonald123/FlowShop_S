@@ -4,69 +4,6 @@ import numpy as np
 from enum import Enum
 from typing import Tuple, List, Dict, Any, Callable, Optional
 
-def decodificar_two_phase(
-    cromossomo: np.ndarray,
-    n: int,
-    m: int,
-    p_matrix: np.ndarray,
-    due_dates: np.ndarray = None,
-    modo: str = "PFS",
-    obj: str = "SPAM"
-) -> float:
-
-    modo_upper = modo.upper().strip()
-    obj_upper = obj.upper().strip()
-
-    # 1. Obtenção da ordem de processamento por máquina
-    if modo_upper == "PFS":
-        seq_unica = np.argsort(cromossomo[:n])
-        ordens_maquinas = [seq_unica for _ in range(m)]
-
-    elif modo_upper == "NPFS":
-        if cromossomo.ndim == 1:
-            chaves_maquinas = cromossomo[:n * m].reshape((m, n))
-        else:
-            chaves_maquinas = cromossomo
-
-        ordens_maquinas = [np.argsort(chaves_maquinas[maq, :]) for maq in range(m)]
-
-    else:
-        raise ValueError(f"Modo '{modo}' inválido. Utilize 'PFS' ou 'NPFS'.")
-
-    completion_time = np.zeros((n, m), dtype=float)
-
-    # Máquina 0 (Primeiro Estágio)
-    tempo_maq = 0.0
-    for job in ordens_maquinas[0]:
-        tempo_maq += p_matrix[job, 0]
-        completion_time[job, 0] = tempo_maq
-
-    # Máquinas Subsequentes (1 até M - 1)
-    for maq in range(1, m):
-        tempo_maq = 0.0
-        for job in ordens_maquinas[maq]:
-            pronto_job = completion_time[job, maq - 1]
-            inicio = max(tempo_maq, pronto_job)
-            completion_time[job, maq] = inicio + p_matrix[job, maq]
-            tempo_maq = completion_time[job, maq]
-
-    # 3. Retorno do Objetivo
-    if obj_upper in ["SPAM", "SPAN", "CMAX", "MAKESPAN"]:
-        return float(np.max(completion_time[:, m - 1]))
-
-    elif obj_upper in ["LMAX", "TMAX"]:
-        if due_dates is None:
-            raise ValueError("due_dates é obrigatório para obj='LMAX'.")
-        atrasos = np.maximum(0.0, completion_time[:, m - 1] - due_dates)
-        return float(np.max(atrasos))
-
-    else:
-        raise ValueError(
-            f"Objetivo '{obj}' inválido. Escolha 'SPAM' (Makespan) ou 'LMAX' (Atraso Máximo)."
-        )
-
-
-# 2. BUSCA LOCAL HOOKE & JEEVES ADAPTADA
 def hooke_jeeves_local_search(
     cromossomo_init: np.ndarray,
     avaliar_func: Callable[[np.ndarray], float],
@@ -306,12 +243,12 @@ class StatefulClusteringSearch:
 
 # 4 - PRINCIPAL — 2P-BRKGA-SCS
 
-def run_brkga_scs(
+def run_brkga_scs_vm(
+    engine, #modificação minha. TESTE para unificar tudo
     n: int,
     m: int,
-    p_matrix: np.ndarray,
-    due_dates: np.ndarray,
     lb: int,
+    objective: str = "Makespan", #modificacao minha, se der erro ja sabe
     tam_pop: int = 100,
     pe: float = 0.2,         # fração de elites
     pm: float = 0.15,        # fração de mutantes
@@ -356,12 +293,12 @@ def run_brkga_scs(
     def avaliar_pfs(sol: np.ndarray):
         nonlocal evals_count
         evals_count += 1
-        return decodificar_two_phase(sol, n, m, p_matrix, due_dates, modo="PFS", obj="SPAM")
+        return engine.evaluate(sol, mode="PFS", objective=objective) #Alterado aqui em
 
     def avaliar_npfs(sol: np.ndarray):
         nonlocal evals_count
         evals_count += 1
-        return decodificar_two_phase(sol, n, m, p_matrix, due_dates, modo="NPFS", obj="SPAM")
+        return engine.evaluate(sol, mode="NPFS", objective=objective) #Alterando aqui tbm. Usando engine para unificar tudo
 
     # --- Duplo Best Rastreamento ---
     best_global_pfs = None
