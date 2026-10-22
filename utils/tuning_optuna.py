@@ -9,7 +9,6 @@ from typing import List, Dict, Any, Optional, Union
 import numpy as np
 import optuna
 
-# Garante que a raiz do projeto esteja no sys.path caso executado via terminal
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
@@ -85,7 +84,6 @@ def selecionar_instancias_por_nivel(
 
 #Espaço de busca do Optuna para cada variante do BRKGA-SCS
 def sugerir_parametros_optuna(trial: optuna.Trial, solver: str) -> Dict[str, Any]:
-    """Define o espaço de busca do Optuna para cada variante do BRKGA-SCS."""
     solver_key = solver.lower().strip()
 
     if solver_key in ["brkga_scs_vr", "vr"]:
@@ -273,10 +271,6 @@ def executar_tuning_optuna(
 
 
 def carregar_melhores_parametros(caminho_json: Union[str, Path]) -> Dict[str, Any]:
-    """
-    Lê o arquivo JSON gerado pelo Optuna e retorna apenas o dicionário
-    `best_params` pronto para ser passado com `**params` para o solver no notebook.
-    """
     caminho = Path(caminho_json)
     if not caminho.exists():
         raise FileNotFoundError(f"Arquivo de parâmetros não encontrado: {caminho}")

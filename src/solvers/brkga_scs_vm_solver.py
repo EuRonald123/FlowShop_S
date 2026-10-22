@@ -332,8 +332,6 @@ def run_brkga_scs(
     max_evals_total: int = 20000,
     t_param: Optional[float] = None, # Parâmetro SOTA de tempo (ex: 30, 60, 90)
     seed: int = 42,
-    #NAO USADO -> ANTIGO RAIO
-    raio_cluster: float = 0.5,
 ):
 
 

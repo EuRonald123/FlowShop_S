@@ -1,0 +1,41 @@
+{
+    "solver": "brkga_scs_vm",
+    "best_rpd_medio": 3.3091,
+    "best_trial": 28,
+    "trials_concluidos": 30,
+    "n_trials_planejados": 30,
+    "tempo_total_s": 1798.88,
+    "criterio_parada_treino": {
+        "t_param": 20,
+        "max_evals": 50000,
+        "seeds": [
+            42
+        ]
+    },
+    "instancias_treino": [
+        "ta001.txt (20x5)",
+        "ta011.txt (20x10)",
+        "ta021.txt (20x20)",
+        "ta031.txt (50x5)",
+        "ta041.txt (50x10)",
+        "ta051.txt (50x20)",
+        "ta061.txt (100x5)",
+        "ta071.txt (100x10)",
+        "ta081.txt (100x20)"
+    ],
+    "best_params": {
+        "tam_pop": 125,
+        "pe": 0.15000000000000002,
+        "pm": 0.15000000000000002,
+        "rho": 0.6,
+        "num_clusters_max": 7,
+        "r_min": 0.04,
+        "r_max": 0.15,
+        "base_cooldown": 8,
+        "gamma": 2.0,
+        "z_limiar": 2.2,
+        "votos_limiar": 5,
+        "step_init": 0.05,
+        "step_reduction": 0.6000000000000001
+    }
+}
