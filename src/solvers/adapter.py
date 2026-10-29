@@ -486,7 +486,6 @@ def rodar_experimento(
         **kwargs,
     )
 
-
 def listar_solvers_disponiveis():
     """Retorna lista de nomes de solvers disponíveis."""
     return list(SOLVER_REGISTRY.keys())

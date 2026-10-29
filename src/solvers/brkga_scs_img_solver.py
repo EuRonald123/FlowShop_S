@@ -267,6 +267,9 @@ def run_brkga_scs_img(
             if budget_mgr.is_exhausted(best_fitness_npfs, lb):
                 break
             fitness_pfs[i] = avaliar_pfs(populacao[i])
+            
+        tempo_decorrido = time.time() - budget_mgr.t0_global
+        history_npfs.append((tempo_decorrido, best_fitness_npfs))
 
     return {
         "best_global_pfs": best_global_pfs,
