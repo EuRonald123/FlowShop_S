@@ -248,7 +248,7 @@ def run_brkga_scs_hybrid(
         populacao = nova_pop
 
         # Só avalia se ainda tiver budget
-        for i in range(config.tam_pop):
+        for i in range(n_elite, config.tam_pop):
             if budget_mgr.is_exhausted(best_fitness_npfs, lb):
                 break
             fitness_pfs[i] = avaliar_pfs(populacao[i])

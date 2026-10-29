@@ -111,7 +111,6 @@ def local_search_r_neh(
             if fit_candidato < melhor_fit_local:
                 melhor_fit_local = fit_candidato
                 melhor_pos = pos
-                print("\n Melhorou no r-NEH")
                 melhorou_iteracao = True
 
         # Atualiza o best_seq global se encontrou melhoria
@@ -145,7 +144,7 @@ def run_brkga_scs_img(
     random.seed(seed)
     history_npfs = []
     
-    t_limite_segundos = 0
+    t_limite_segundos = None
     if config.t_param is not None:
         t_limite_segundos = (n * m * config.t_param / 2.0) / 1000.0
         
@@ -263,7 +262,7 @@ def run_brkga_scs_img(
 
         populacao = nova_pop
 
-        for i in range(config.tam_pop):
+        for i in range(n_elite, config.tam_pop):
             if budget_mgr.is_exhausted(best_fitness_npfs, lb):
                 break
             fitness_pfs[i] = avaliar_pfs(populacao[i])
