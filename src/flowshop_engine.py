@@ -86,9 +86,6 @@ class FlowShopEngine:
         except Exception as e:
             raise ValueError(f"Erro ao processar arquivo Taillard {caminho_arquivo}: {e}")
 
-
-
-
     @staticmethod
     def calcular_lower_bound_potts(num_jobs, num_machines, p_matrix, due_dates):
         max_lateness_global = -float('inf')
