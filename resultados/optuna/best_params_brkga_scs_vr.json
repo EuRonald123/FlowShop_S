@@ -1,0 +1,38 @@
+{
+    "solver": "brkga_scs_vr",
+    "best_rpd_medio": 3.8217,
+    "best_trial": 21,
+    "trials_concluidos": 30,
+    "n_trials_planejados": 30,
+    "tempo_total_s": 1799.6,
+    "criterio_parada_treino": {
+        "t_param": 20,
+        "max_evals": 50000,
+        "seeds": [
+            42
+        ]
+    },
+    "instancias_treino": [
+        "ta001.txt (20x5)",
+        "ta011.txt (20x10)",
+        "ta021.txt (20x20)",
+        "ta031.txt (50x5)",
+        "ta041.txt (50x10)",
+        "ta051.txt (50x20)",
+        "ta061.txt (100x5)",
+        "ta071.txt (100x10)",
+        "ta081.txt (100x20)"
+    ],
+    "best_params": {
+        "tam_pop": 150,
+        "pe": 0.15000000000000002,
+        "pm": 0.15000000000000002,
+        "rho": 0.8,
+        "raio_cluster": 0.5,
+        "z_limiar": 2.5,
+        "votos_limiar": 10,
+        "step_init": 0.05,
+        "step_reduction": 0.4,
+        "max_hj_evals": 300
+    }
+}
