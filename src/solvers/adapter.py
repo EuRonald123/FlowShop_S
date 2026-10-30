@@ -434,6 +434,127 @@ def rodar_brkga_scs_img(
     )
 
 
+def rodar_brkga_scs_dmn(
+    engine,
+    seed=1,
+    objective="Makespan",
+    max_evals=10000,
+    t_param: Optional[float] = None,
+    tam_pop=120,
+    pe=0.11212046437065624,
+    pm=0.13446639057746165,
+    rho=0.625482442756382,
+    raio_cluster=0.2911841517490964,
+    z_limiar=2.663254814073459,
+    votos_limiar=5,
+    step_init=0.12311987581856942,
+    step_reduction=0.2859358405947909,
+    min_step=0.0001987783944399475,
+    max_hj_evals=600,
+    max_generations=129999,
+    verbose=False,
+) -> SolverResult:
+    """
+    Executa o 2P-BRKGA-SCS com Busca Local no Espaço de Domínio (Coordinate Descent)
+    e retorna SolverResult padronizado.
+    """
+    from src.solvers.brkga_scs_dmn_solver import run_brkga_scs_dmn, Config
+    from src.flowshop_engine import FlowShopEngine
+
+    n = engine.n_jobs
+    m = engine.n_machines
+
+    cfg = Config(
+        tam_pop=tam_pop,
+        pe=pe,
+        pm=pm,
+        rho=rho,
+        raio_cluster=raio_cluster,
+        z_limiar=z_limiar,
+        votos_limiar=votos_limiar,
+        step_init=step_init,
+        step_reduction=step_reduction,
+        min_step=min_step,
+        max_hj_evals=max_hj_evals,
+        max_generations=max_generations,
+        max_evals_total=max_evals,
+        t_param=t_param,
+        obj=objective,
+    )
+
+    params = {
+        "max_evals": max_evals,
+        "t_param": t_param,
+        "tam_pop": tam_pop,
+        "pe": pe,
+        "pm": pm,
+        "rho": rho,
+        "raio_cluster": raio_cluster,
+        "z_limiar": z_limiar,
+        "votos_limiar": votos_limiar,
+        "step_init": step_init,
+        "step_reduction": step_reduction,
+        "min_step": min_step,
+        "max_hj_evals": max_hj_evals,
+        "max_generations": max_generations,
+    }
+
+    lb = FlowShopEngine.calcular_lower_bound_potts(
+        engine.n_jobs, engine.n_machines,
+        engine.proc_times, engine.due_dates
+    )
+
+    t0 = time.time()
+    result = run_brkga_scs_dmn(
+        engine=engine,
+        n=n, m=m,
+        lb=lb,
+        config=cfg,
+        seed=seed,
+    )
+    elapsed = time.time() - t0
+
+    best_perm = None
+    if result["best_global_npfs"] is not None:
+        keys = result["best_global_npfs"]
+        if keys.ndim == 1:
+            keys = keys.reshape((m, n))
+        best_perm = np.zeros((m, n), dtype=int)
+        for maq in range(m):
+            best_perm[maq] = np.argsort(keys[maq])
+    elif result["best_global_pfs"] is not None:
+        keys_pfs = result["best_global_pfs"]
+        best_perm = np.zeros((m, n), dtype=int)
+        for maq in range(m):
+            best_perm[maq] = np.argsort(keys_pfs)
+
+    if best_perm is not None:
+        makespan, tardiness, cfo = _avaliar_na_engine(engine, best_perm, mode="NPFS")
+    else:
+        makespan = float("inf")
+        tardiness = float("inf")
+        cfo = 0
+
+    history = result.get("history", result.get("history_npfs", []))
+    if not history:
+        history = [makespan]
+
+    return SolverResult(
+        solver_name="BRKGA-SCS",
+        version="dmn",
+        mode="NPFS",
+        best_perm=best_perm,
+        best_cost=makespan,
+        tardiness=tardiness,
+        history=history,
+        time_seconds=elapsed,
+        n_evaluations=result["total_evaluations"],
+        params=params,
+        lower_bound=lb,
+        engine_cfo_count=cfo,
+    )
+
+
 # ============================================================================
 # 8. Função genérica: rodar_experimento
 # ============================================================================
@@ -443,6 +564,7 @@ SOLVER_REGISTRY = {
     "BRKGA_SCS": rodar_brkga_scs_vm,
     "BRKGA_SCS_VR": rodar_brkga_scs_vr,
     "BRKGA_SCS_IMG": rodar_brkga_scs_img,
+    "BRKGA_SCS_DMN": rodar_brkga_scs_dmn,
     
 }
 

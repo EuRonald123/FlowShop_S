@@ -141,7 +141,6 @@ def run_brkga_scs_img(
 ) -> Dict[str, Any]:
 
     np.random.seed(seed)
-    random.seed(seed)
     history_npfs = []
     
     t_limite_segundos = None
@@ -151,7 +150,7 @@ def run_brkga_scs_img(
     budget_mgr = BudgetManager(
         max_evals=config.max_evals_total,
         t_limite_segundos=t_limite_segundos
-        ) 
+    ) 
     
 
     def avaliar_pfs(sol: np.ndarray) -> float:
