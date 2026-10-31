@@ -146,6 +146,41 @@ class BRKGARSCSolver:
         for job in sorted_jobs[1:]:
             seq = self._best_neh_insertion(seq, int(job))
         return np.array(seq, dtype=int)
+
+    def _local_search(self, key, cost, perturb = False):
+        """
+        Fast Discrete Insertion Local Search + IG Perturbation
+        with Lamarckian re-encoding into random keys.
+        """
+        seq = list(np.argsort(key))
+
+        # 1. Perturbation (Destruction-Construction of 4 jobs) to escape local optima
+        if perturb and self.n > 4:
+            d = min(4, self.n - 1)
+            removed_idx = sorted(
+                self.rng.choice(self.n, size=d, replace=False), reverse=True
+            )
+            removed_jobs = [seq.pop(idx) for idx in removed_idx]
+            for job in removed_jobs:
+                seq = self._best_neh_insertion(seq, int(job))
+
+        # 2. Insertion Local Search on a sample of jobs
+        n_checks = min(self.n, 25)
+        jobs_to_check = self.rng.choice(self.n, size=n_checks, replace=False)
+
+        for job in jobs_to_check:
+            if self._stop_criterion():
+                break
+            seq.remove(int(job))
+            seq = self._best_neh_insertion(seq, int(job))
+
+        # 3. Re-encode to continuous keys and evaluate
+        new_key = self._permutation_to_key(np.array(seq, dtype=int))
+        new_cost = self._evaluate_key(new_key)
+
+        if new_cost < cost:
+            return new_key, new_cost
+        return key, cost
     
     #LOOP
     def execute(self):
@@ -153,9 +188,18 @@ class BRKGARSCSolver:
         self.n_evals = 0
         
         population, costs = self._initialize_population()
+
+        # Refine the best initial (NEH) individual right at the start
+        if not self._stop_criterion():
+            population[0], costs[0] = self._local_search(
+                population[0], costs[0], perturb=False
+            )
+            population, costs = self._order_population(population, costs)
+
         self.history.append((self.n_evals, time.time() - self.t0, self.best_cost))
         
         while not self._stop_criterion():
+            prev_best = self.best_cost
             elite = population[:self.n_elite]
             non_elite = population[self.n_elite :]
             
@@ -174,6 +218,19 @@ class BRKGARSCSolver:
             
             # Order the new population
             population, costs = self._order_population(population, costs)
+
+            # Lamarckian Local Search on Elite
+            if not self._stop_criterion():
+                stagnated = (self.best_cost >= prev_best)
+                idx_target = 0 if not stagnated else int(self.rng.integers(0, self.n_elite))
+                new_key, new_cost = self._local_search(
+                    population[idx_target], costs[idx_target], perturb=stagnated
+                )
+                if new_cost < costs[idx_target]:
+                    population[idx_target] = new_key
+                    costs[idx_target] = new_cost
+                    population, costs = self._order_population(population, costs)
+
             self.history.append((self.n_evals, time.time() - self.t0, self.best_cost))
             
         best_permutation = np.argsort(self.best_key)
