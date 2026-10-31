@@ -102,7 +102,10 @@ class BRKGARSCSolver:
     
     
     #Entendi nadinha dessa funcao. Dhabo é isso?
-    def _best_neh_insertion(self, seq: List[int], job: int) -> List[int]:
+    def _best_neh_insertion(
+        self, seq: List[int], job: int, orig_pos: Optional[int] = None
+    ) -> List[int]:
+        self.n_evals += 1
         k = len(seq)
         m = self.m
         pt = self.engine.proc_times
@@ -132,7 +135,11 @@ class BRKGARSCSolver:
             f[1:, j] = np.maximum(e[:, j], f[1:, j - 1]) + p_new[j]
         
         makespan = np.max(f + q, axis=1)
-        best_position = np.argmin(makespan)
+        best_position = int(np.argmin(makespan))
+
+        # Strict improvement rule: keep original position on ties
+        if orig_pos is not None and makespan[best_position] >= makespan[orig_pos]:
+            best_position = orig_pos
         
         new_seq = list(seq)
         new_seq.insert(best_position, job)
@@ -164,15 +171,16 @@ class BRKGARSCSolver:
             for job in removed_jobs:
                 seq = self._best_neh_insertion(seq, int(job))
 
-        # 2. Insertion Local Search on a sample of jobs
+        # 2. Insertion Local Search on a sample of jobs (strict improvement)
         n_checks = min(self.n, 25)
         jobs_to_check = self.rng.choice(self.n, size=n_checks, replace=False)
 
         for job in jobs_to_check:
             if self._stop_criterion():
                 break
-            seq.remove(int(job))
-            seq = self._best_neh_insertion(seq, int(job))
+            orig_pos = seq.index(int(job))
+            seq.pop(orig_pos)
+            seq = self._best_neh_insertion(seq, int(job), orig_pos=orig_pos)
 
         # 3. Re-encode to continuous keys and evaluate
         new_key = self._permutation_to_key(np.array(seq, dtype=int))
