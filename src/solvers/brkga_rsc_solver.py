@@ -147,16 +147,16 @@ class BRKGARSCSolver:
             seq = self._best_neh_insertion(seq, int(job))
         return np.array(seq, dtype=int)
 
-    def _local_search(self, key, cost, perturb = False):
+    def _local_search(self, key, cost, perturb=False, d_perturb=4):
         """
         Fast Discrete Insertion Local Search + IG Perturbation
         with Lamarckian re-encoding into random keys.
         """
         seq = list(np.argsort(key))
 
-        # 1. Perturbation (Destruction-Construction of 4 jobs) to escape local optima
-        if perturb and self.n > 4:
-            d = min(4, self.n - 1)
+        # 1. Perturbation (Destruction-Construction of d jobs) to escape local optima
+        if perturb and self.n > d_perturb:
+            d = min(d_perturb, self.n - 1)
             removed_idx = sorted(
                 self.rng.choice(self.n, size=d, replace=False), reverse=True
             )
@@ -178,9 +178,34 @@ class BRKGARSCSolver:
         new_key = self._permutation_to_key(np.array(seq, dtype=int))
         new_cost = self._evaluate_key(new_key)
 
-        if new_cost < cost:
-            return new_key, new_cost
-        return key, cost
+        return new_key, new_cost
+
+    def _micro_restart(self, population, costs):
+        """
+        Keep only the top 20% of the Elite intact, diversify the rest of the Elite
+        via strong Destruction-Construction, and kill 100% of the Non-Elite (80% of pop)
+        replacing them with fresh random individuals.
+        """
+        n_keep = max(1, int(self.n_elite * 0.20))
+
+        # 1. Diversify the remaining 80% of the Elite with strong perturbations (d=6)
+        for i in range(n_keep, self.n_elite):
+            if self._stop_criterion():
+                break
+            base_idx = i % n_keep
+            population[i], costs[i] = self._local_search(
+                population[base_idx], costs[base_idx], perturb=True, d_perturb=6
+            )
+
+        # 2. Kill the entire Non-Elite (80% of the population) and generate fresh individuals
+        n_non_elite = self.size_population - self.n_elite
+        population[self.n_elite :] = self.rng.random((n_non_elite, self.n))
+        for i in range(self.n_elite, self.size_population):
+            if self._stop_criterion():
+                break
+            costs[i] = self._evaluate_key(population[i])
+
+        return self._order_population(population, costs)
     
     #LOOP
     def execute(self):
@@ -191,12 +216,15 @@ class BRKGARSCSolver:
 
         # Refine the best initial (NEH) individual right at the start
         if not self._stop_criterion():
-            population[0], costs[0] = self._local_search(
+            new_key, new_cost = self._local_search(
                 population[0], costs[0], perturb=False
             )
-            population, costs = self._order_population(population, costs)
+            if new_cost < costs[0]:
+                population[0], costs[0] = new_key, new_cost
+                population, costs = self._order_population(population, costs)
 
         self.history.append((self.n_evals, time.time() - self.t0, self.best_cost))
+        stagnation_count = 0
         
         while not self._stop_criterion():
             prev_best = self.best_cost
@@ -219,7 +247,7 @@ class BRKGARSCSolver:
             # Order the new population
             population, costs = self._order_population(population, costs)
 
-            # Lamarckian Local Search on Elite
+            # Passo 3: Lamarckian Local Search on Elite
             if not self._stop_criterion():
                 stagnated = (self.best_cost >= prev_best)
                 idx_target = 0 if not stagnated else int(self.rng.integers(0, self.n_elite))
@@ -230,6 +258,21 @@ class BRKGARSCSolver:
                     population[idx_target] = new_key
                     costs[idx_target] = new_cost
                     population, costs = self._order_population(population, costs)
+                elif stagnated and new_cost < costs[self.n_elite - 1]:
+                    # Replace the worst elite individual to prevent elite cloning
+                    population[self.n_elite - 1] = new_key
+                    costs[self.n_elite - 1] = new_cost
+                    population, costs = self._order_population(population, costs)
+
+            # Passo 4: Stagnation Tracking & Micro-Restart
+            if self.best_cost < prev_best:
+                stagnation_count = 0
+            else:
+                stagnation_count += 1
+
+            if stagnation_count >= 20 and not self._stop_criterion():
+                population, costs = self._micro_restart(population, costs)
+                stagnation_count = 0
 
             self.history.append((self.n_evals, time.time() - self.t0, self.best_cost))
             
