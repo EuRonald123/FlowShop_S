@@ -1,5 +1,6 @@
-metodo,makespan_medio,tardiness_medio,tempo_medio,rpd_medio
-brkga_scs_dmn,7451.0,1078819.5,58.878,3.83
-brkga_scs_img,7530.9,1097259.2,58.936,4.1
-brkga_scs_vm,7420.7,1079954.9,58.897,3.41
-brkga_scs_vr,7611.7,1096495.1,58.914,5.88
+metodo,makespan_medio,tardiness_medio,cfo_medio,tempo_medio,rpd_medio
+brkga_rsc,6803.6,957309.6,17674,55.046,0.9
+brkga_scs_dmn,7029.3,992065.2,32490,54.978,3.85
+brkga_scs_img,7100.0,1008914.0,20394,55.033,3.99
+brkga_scs_vm,6996.8,993078.9,22946,54.996,3.26
+brkga_scs_vr,5892.8,766039.7,23294,43.047,5.23

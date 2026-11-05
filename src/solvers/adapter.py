@@ -553,6 +553,70 @@ def rodar_brkga_scs_dmn(
         lower_bound=lb,
         engine_cfo_count=cfo,
     )
+    
+def rodar_brkga_rsc(
+    engine,
+    seed=1,
+    objective="Makespan",
+    max_evals=50000,
+    t_param: Optional[float] = None,
+    size_population=100,
+    pe=0.20,
+    pm=0.15,
+    rho=0.70,
+    verbose=False,
+) -> SolverResult:
+    
+    from src.solvers.brkga_rsc_solver import BRKGARSCSolver
+    from src.flowshop_engine import FlowShopEngine
+    
+    lb = FlowShopEngine.calcular_lower_bound_potts(
+        engine.n_jobs, engine.n_machines,
+        engine.proc_times, engine.due_dates
+    )
+    
+    params = {
+        "max_evals": max_evals,
+        "t_param": t_param,
+        "size_population": size_population,
+        "pe": pe,
+        "pm": pm,
+        "rho": rho,
+    }
+    
+    solver = BRKGARSCSolver(
+        engine=engine,
+        seed=seed,
+        objective=objective,
+        size_population=size_population,
+        pe=pe,
+        pm=pm,
+        rho=rho,
+        max_evals=max_evals,
+        t_param=t_param,
+        lb=lb
+    )
+    
+    t0 = time.time()
+    best_permutation, best_cost, n_evals, history = solver.execute()
+    elapsed = time.time() - t0
+    
+    makespan, tardiness, cfo = _avaliar_na_engine(engine, best_permutation, mode="PFS")
+    
+    return SolverResult(
+        solver_name="BRKGA",
+        version="rsc",
+        mode="PFS",
+        best_perm=best_permutation,
+        best_cost=best_cost,
+        tardiness=tardiness,
+        history=history,
+        time_seconds=elapsed,
+        n_evaluations=n_evals,
+        params=params,
+        lower_bound=lb,
+        engine_cfo_count=cfo,
+    )
 
 
 # ============================================================================
@@ -566,6 +630,8 @@ SOLVER_REGISTRY = {
     "BRKGA_SCS_IMG": rodar_brkga_scs_img,
     "BRKGA_SCS_DMN": rodar_brkga_scs_dmn,
     
+    #minha versão
+    "BRKGA_RSC": rodar_brkga_rsc,
 }
 
 
