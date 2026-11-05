@@ -101,7 +101,6 @@ class BRKGARSCSolver:
         return key
     
     
-    #Entendi nadinha dessa funcao. Dhabo é isso?
     def _best_neh_insertion(
         self, seq: List[int], job: int, orig_pos: Optional[int] = None
     ) -> List[int]:
