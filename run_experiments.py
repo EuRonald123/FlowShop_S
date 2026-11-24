@@ -193,19 +193,29 @@ def resolver_csv_saida(
     modo: str,
     output_custom: Optional[str],
     instancias_especificas: Optional[List[str]],
+    t_param: Optional[float],
+    max_evals: int,
+    objective: str,
 ) -> Path:
     """Resolve o caminho padrão de saída ou um caminho customizado relativo à raiz."""
     if output_custom:
         p = Path(output_custom)
         return p if p.is_absolute() else (ROOT / p)
 
-    pasta = RESULTADOS_DIR / VARIANTES[metodo]["subdir"]
-    if instancias_especificas:
-        nome = f"results_{metodo}_custom_taillard.csv"
-    elif modo == "poucas":
-        nome = f"results_{metodo}_poucas_instancias_taillard.csv"
+    if t_param is not None:
+        parada_tag = str(int(t_param)) if float(t_param).is_integer() else f"{t_param:g}"
     else:
-        nome = f"results_{metodo}_taillard.csv"
+        parada_tag = f"evals{max_evals}"
+
+    obj_tag = objective.lower()
+    pasta = RESULTADOS_DIR / VARIANTES[metodo]["subdir"]
+
+    if instancias_especificas:
+        nome = f"results_{metodo}_{parada_tag}_{obj_tag}_custom_taillard.csv"
+    elif modo == "poucas":
+        nome = f"results_{metodo}_{parada_tag}_{obj_tag}_poucas_instancias_taillard.csv"
+    else:
+        nome = f"results_{metodo}_{parada_tag}_{obj_tag}_taillard.csv"
     return pasta / nome
 
 
@@ -427,7 +437,15 @@ def main() -> int:
     params = carregar_parametros_variante(args.metodo)
 
     catalogo = construir_catalogo(DATA_DIR, args.catalogo, args.instancias)
-    csv_path = resolver_csv_saida(args.metodo, args.catalogo, args.output, args.instancias)
+    csv_path = resolver_csv_saida(
+        args.metodo,
+        args.catalogo,
+        args.output,
+        args.instancias,
+        t_param,
+        args.max_evals,
+        args.objective,
+    )
     error_log_path = csv_path.parent / f"errors_{args.metodo}.log"
 
     bks_path = DATA_DIR / "taillard_bks.json"
@@ -462,7 +480,11 @@ def main() -> int:
     print(f"Método:    {args.metodo} | Catálogo: {'custom' if args.instancias else args.catalogo}", flush=True)
     print(f"CSV:       {csv_path}", flush=True)
     print(f"Execuções: {ja_concluidas} concluídas | {len(tarefas)} pendentes (total: {total_planejado})", flush=True)
-    print(f"Workers:   {workers} | Parada: {'t_param=' + str(t_param) if t_param else 'max_evals=' + str(args.max_evals)}", flush=True)
+    print(
+        f"Workers:   {workers} | Parada: {'t_param=' + str(t_param) if t_param else 'max_evals=' + str(args.max_evals)} "
+        f"| Objetivo: {args.objective}",
+        flush=True,
+    )
     print("=" * 78, flush=True)
 
     if args.dry_run or not tarefas:
