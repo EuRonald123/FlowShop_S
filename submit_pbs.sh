@@ -1,32 +1,25 @@
 #!/bin/bash
 #PBS -N flowshop_exp
-#PBS -l nodes=NOME_DO_NO:ppn=8
+#PBS -l select=1:ncpus=24:mem=16gb
 #PBS -l walltime=04:00:00
+#PBS -l cput=24:00:00
 #PBS -j oe
-## Descomente abaixo caso o cluster exija informar a fila explicitamente:
-##PBS -q NOME_DA_FILA
 
-# =============================================================================
 # Script de submissão PBS — Experimentos Flow Shop Scheduling
 #
-# Ajuste acima:
-#   - nodes=NOME_DO_NO:ppn=N  -> nó específico e quantidade de núcleos reservados
-#   - walltime=HH:MM:SS       -> limite de tempo permitido pela fila
-#
-# Uso padrão (editando as variáveis abaixo):
+# Uso padrão:
 #   qsub submit_pbs.sh
 #
-# Uso sobrescrevendo método/catálogo sem editar o arquivo:
-#   qsub -v METODO=brkga_rsc,CATALOGO=completo submit_pbs.sh
-# =============================================================================
+# Sobrescrevendo parâmetros sem editar o arquivo:
+#   qsub -v METODO=brkga_rsc,CATALOGO=poucas,SEEDS=1,T_PARAM=5 submit_pbs.sh
 
 set -euo pipefail
 
-# --- Configuração do ambiente Miniconda ---
-CONDA_BASE="${HOME}/miniconda3"
+# --- Ambiente micromamba ---
+MAMBA_BIN="${MAMBA_BIN:-${HOME}/.local/bin/micromamba}"
+export MAMBA_ROOT_PREFIX="${HOME}/micromamba"
 CONDA_ENV="flowshop"
 
-# --- Parâmetros do experimento (podem ser sobrescritos via -v no qsub/psub) ---
 METODO="${METODO:-brkga_rsc}"
 CATALOGO="${CATALOGO:-completo}"
 SEEDS="${SEEDS:-5}"
@@ -34,40 +27,38 @@ SEED_INICIO="${SEED_INICIO:-100}"
 T_PARAM="${T_PARAM:-60}"
 WORKERS="${WORKERS:-auto}"
 
-# Vai para o diretório raiz do projeto a partir de onde o job foi submetido
+# Vai para o diretório de onde o job foi submetido
 cd "${PBS_O_WORKDIR:-$(dirname "$0")}"
 
-# Garante PBS_NP definido mesmo em versões antigas do PBS/Torque
-if [ -z "${PBS_NP:-}" ] && [ -n "${PBS_NODEFILE:-}" ] && [ -f "${PBS_NODEFILE}" ]; then
-    export PBS_NP
-    PBS_NP="$(wc -l < "${PBS_NODEFILE}")"
-fi
+PBS_NP="${PBS_NP:-${NCPUS:-1}}"
+export PBS_NP
 
-# Ativa o ambiente Miniconda em shell não-interativo
-if [ ! -f "${CONDA_BASE}/etc/profile.d/conda.sh" ]; then
-    echo "[ERRO] Miniconda não encontrado em: ${CONDA_BASE}" >&2
+# Ativa o ambiente
+if [ ! -x "${MAMBA_BIN}" ]; then
+    echo "[ERRO] micromamba não encontrado em: ${MAMBA_BIN}" >&2
     exit 1
 fi
-# shellcheck source=/dev/null
-source "${CONDA_BASE}/etc/profile.d/conda.sh"
-conda activate "${CONDA_ENV}"
+set +u
+eval "$("${MAMBA_BIN}" shell hook --shell bash)"
+micromamba activate "${CONDA_ENV}"
+set -u
 
-# Mantém 1 thread BLAS/OpenMP por processo worker
+# 1 thread BLAS/OpenMP por processo worker
 export OMP_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export VECLIB_MAXIMUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
-echo "=============================================================================="
+echo "*-*-*-*-*"
 echo "Início:    $(date '+%Y-%m-%d %H:%M:%S')"
 echo "Job ID:    ${PBS_JOBID:-local}"
 echo "Nó:        $(hostname)"
-echo "Núcleos:   ${PBS_NP:-1}"
+echo "Núcleos:   ${PBS_NP} (NCPUS=${NCPUS:-?})"
 echo "Diretório: $(pwd)"
-echo "Python:    $(which python)"
-echo "Config:    metodo=${METODO} catalogo=${CATALOGO} seeds=${SEEDS} workers=${WORKERS}"
-echo "=============================================================================="
+echo "Python:    $(which python) ($(python --version 2>&1))"
+echo "Config:    metodo=${METODO} catalogo=${CATALOGO} seeds=${SEEDS} t_param=${T_PARAM} workers=${WORKERS}"
+echo "*-*-*-*-*"
 
 STATUS=0
 python -u run_experiments.py \
@@ -78,7 +69,7 @@ python -u run_experiments.py \
     --t-param "${T_PARAM}" \
     --workers "${WORKERS}" || STATUS=$?
 
-echo "=============================================================================="
+echo "*-*-*-*-*"
 echo "Término:   $(date '+%Y-%m-%d %H:%M:%S') | Código de saída: ${STATUS}"
-echo "=============================================================================="
+echo "*-*-*-*-*"
 exit "${STATUS}"

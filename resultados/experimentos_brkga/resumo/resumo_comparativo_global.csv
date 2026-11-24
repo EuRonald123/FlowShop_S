@@ -1,6 +1,0 @@
-metodo,makespan_medio,tardiness_medio,cfo_medio,tempo_medio,rpd_medio
-brkga_rsc,6803.6,957309.6,17674,55.046,0.9
-brkga_scs_dmn,7029.3,992065.2,32490,54.978,3.85
-brkga_scs_img,7100.0,1008914.0,20394,55.033,3.99
-brkga_scs_vm,6996.8,993078.9,22946,54.996,3.26
-brkga_scs_vr,5892.8,766039.7,23294,43.047,5.23
